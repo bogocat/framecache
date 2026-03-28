@@ -57,6 +57,16 @@ class MainActivity : ComponentActivity() {
             ImmichFrameTheme {
                 val isConfigured by settings.isConfigured.collectAsState(initial = false)
                 val (showSettings, setShowSettings) = remember { mutableStateOf(false) }
+                val orientationLock by settings.orientationLock.collectAsState(initial = "auto")
+
+                // Apply orientation lock
+                androidx.compose.runtime.LaunchedEffect(orientationLock) {
+                    requestedOrientation = when (orientationLock) {
+                        "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                        else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
+                }
 
                 when {
                     !isConfigured -> {

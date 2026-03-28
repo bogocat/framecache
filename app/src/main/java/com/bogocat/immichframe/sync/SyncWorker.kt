@@ -76,6 +76,12 @@ class SyncWorker @AssistedInject constructor(
 
             val count = assetDao.getCachedCount()
             Log.i(TAG, "Sync complete. $count images cached")
+
+            // Record last sync time
+            val now = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
+                .format(java.util.Date())
+            settings.save(SettingsRepository.LAST_SYNC_TIME, now)
+
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Sync failed: ${e.message}", e)

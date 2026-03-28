@@ -82,6 +82,12 @@ fun SettingsScreen(
     val showCamera by settings.showCamera.collectAsState(initial = false)
     val syncInterval by settings.syncIntervalMinutes.collectAsState(initial = 60)
     val maxCached by settings.maxCachedImages.collectAsState(initial = 300)
+    val lastSync by settings.lastSyncTime.collectAsState(initial = "Never")
+    val sleepEnabled by settings.sleepEnabled.collectAsState(initial = false)
+    val sleepStartHour by settings.sleepStartHour.collectAsState(initial = 22)
+    val sleepEndHour by settings.sleepEndHour.collectAsState(initial = 7)
+    val sleepDim by settings.sleepDim.collectAsState(initial = true)
+    val orientationLock by settings.orientationLock.collectAsState(initial = "auto")
 
     var editUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
     var editApiKey by remember(apiKey) { mutableStateOf(apiKey) }
@@ -244,6 +250,7 @@ fun SettingsScreen(
 
         InfoRow("Photos cached", "${cacheManager.getCacheFileCount()}")
         InfoRow("Disk usage", "${cacheManager.getCacheSizeBytes() / 1024 / 1024} MB")
+        InfoRow("Last sync", lastSync)
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -251,6 +258,63 @@ fun SettingsScreen(
             onClick = { SyncScheduler.triggerImmediateSync(context) },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = textColor)
         ) { Text("Sync Now", color = textColor) }
+
+        SectionDivider()
+
+        // ── Sleep ──
+        SectionHeader("Sleep Schedule")
+
+        SettingsToggle("Enable Sleep Mode", sleepEnabled) {
+            scope.launch { settings.save(SettingsRepository.SLEEP_ENABLED, it) }
+        }
+
+        if (sleepEnabled) {
+            SliderSetting(
+                label = "Sleep Start",
+                value = sleepStartHour.toFloat(),
+                range = 0f..23f,
+                unit = ":00",
+                steps = 22,
+                onValueChange = { scope.launch { settings.save(SettingsRepository.SLEEP_START_HOUR, it.roundToInt()) } }
+            )
+            SliderSetting(
+                label = "Wake Up",
+                value = sleepEndHour.toFloat(),
+                range = 0f..23f,
+                unit = ":00",
+                steps = 22,
+                onValueChange = { scope.launch { settings.save(SettingsRepository.SLEEP_END_HOUR, it.roundToInt()) } }
+            )
+            SettingsToggle("Dim (vs black)", sleepDim) {
+                scope.launch { settings.save(SettingsRepository.SLEEP_DIM, it) }
+            }
+        }
+
+        SectionDivider()
+
+        // ── Display ──
+        SectionHeader("Display")
+
+        // Orientation selector
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Orientation", color = textColor, fontSize = 16.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("auto" to "Auto", "landscape" to "Landscape", "portrait" to "Portrait").forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { scope.launch { settings.save(SettingsRepository.ORIENTATION_LOCK, value) } },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (orientationLock == value) Color.Black else textColor,
+                            containerColor = if (orientationLock == value) sectionColor else Color.Transparent
+                        ),
+                        modifier = Modifier.height(36.dp)
+                    ) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
 
         SectionDivider()
 

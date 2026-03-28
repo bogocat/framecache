@@ -58,7 +58,28 @@ fun SlideshowScreen(
     val kenBurnsZoom by viewModel.kenBurnsZoom.collectAsState()
     val backgroundBlur by viewModel.backgroundBlur.collectAsState()
     val imageScale by viewModel.imageScale.collectAsState()
-    val slideDuration by viewModel.state.collectAsState()
+    val sleepEnabled by viewModel.sleepEnabled.collectAsState()
+    val sleepStartHour by viewModel.sleepStartHour.collectAsState()
+    val sleepEndHour by viewModel.sleepEndHour.collectAsState()
+    val sleepDim by viewModel.sleepDim.collectAsState()
+
+    // Check if in sleep hours
+    var isSleeping by remember { mutableStateOf(false) }
+    LaunchedEffect(sleepEnabled, sleepStartHour, sleepEndHour) {
+        while (true) {
+            if (sleepEnabled) {
+                val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                isSleeping = if (sleepStartHour > sleepEndHour) {
+                    hour >= sleepStartHour || hour < sleepEndHour
+                } else {
+                    hour in sleepStartHour until sleepEndHour
+                }
+            } else {
+                isSleeping = false
+            }
+            delay(60_000)
+        }
+    }
 
     // Burn-in prevention: shift content by 1-2px every 60s
     var shiftX by remember { mutableStateOf(0f) }
@@ -136,6 +157,15 @@ fun SlideshowScreen(
                 showPeople = showPeople,
                 showCamera = showCamera,
                 dateFormat = dateFormat
+            )
+        }
+
+        // Sleep overlay
+        if (isSleeping) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(if (sleepDim) Color(0xDD000000) else Color.Black)
             )
         }
 

@@ -50,6 +50,16 @@ class SettingsRepository @Inject constructor(
         // Sync
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val MAX_CACHED_IMAGES = intPreferencesKey("max_cached_images")
+        val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
+
+        // Sleep
+        val SLEEP_ENABLED = booleanPreferencesKey("sleep_enabled")
+        val SLEEP_START_HOUR = intPreferencesKey("sleep_start_hour")
+        val SLEEP_END_HOUR = intPreferencesKey("sleep_end_hour")
+        val SLEEP_DIM = booleanPreferencesKey("sleep_dim")
+
+        // Display
+        val ORIENTATION_LOCK = stringPreferencesKey("orientation_lock")
     }
 
     // Connection
@@ -80,6 +90,16 @@ class SettingsRepository @Inject constructor(
     // Sync
     val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[SYNC_INTERVAL_MINUTES] ?: 60 }
     val maxCachedImages: Flow<Int> = context.dataStore.data.map { it[MAX_CACHED_IMAGES] ?: 300 }
+    val lastSyncTime: Flow<String> = context.dataStore.data.map { it[LAST_SYNC_TIME] ?: "Never" }
+
+    // Sleep
+    val sleepEnabled: Flow<Boolean> = context.dataStore.data.map { it[SLEEP_ENABLED] ?: false }
+    val sleepStartHour: Flow<Int> = context.dataStore.data.map { it[SLEEP_START_HOUR] ?: 22 }
+    val sleepEndHour: Flow<Int> = context.dataStore.data.map { it[SLEEP_END_HOUR] ?: 7 }
+    val sleepDim: Flow<Boolean> = context.dataStore.data.map { it[SLEEP_DIM] ?: true }
+
+    // Display
+    val orientationLock: Flow<String> = context.dataStore.data.map { it[ORIENTATION_LOCK] ?: "auto" }
 
     val isConfigured: Flow<Boolean> = context.dataStore.data.map {
         !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()

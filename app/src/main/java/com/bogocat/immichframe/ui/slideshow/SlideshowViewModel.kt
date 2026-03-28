@@ -51,6 +51,12 @@ class SlideshowViewModel @Inject constructor(
     val backgroundBlur = settings.backgroundBlur.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val imageScale = settings.imageScale.stateIn(viewModelScope, SharingStarted.Eagerly, "fit")
 
+    // Sleep
+    val sleepEnabled = settings.sleepEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val sleepStartHour = settings.sleepStartHour.stateIn(viewModelScope, SharingStarted.Eagerly, 22)
+    val sleepEndHour = settings.sleepEndHour.stateIn(viewModelScope, SharingStarted.Eagerly, 7)
+    val sleepDim = settings.sleepDim.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     private var slideshowJob: Job? = null
 
     init {

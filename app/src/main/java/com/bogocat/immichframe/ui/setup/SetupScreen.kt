@@ -1,5 +1,6 @@
 package com.bogocat.immichframe.ui.setup
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,10 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,8 +29,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bogocat.immichframe.api.ImmichApi
 import com.bogocat.immichframe.api.model.AlbumResponse
 import com.bogocat.immichframe.data.settings.SettingsRepository
@@ -36,6 +41,22 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+
+private val textColor = Color.White
+private val accentColor = Color(0xFF4FC3F7)
+private val bgColor = Color(0xFF1A1A1A)
+private val fieldColors
+    @Composable get() = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = textColor,
+        unfocusedTextColor = textColor,
+        focusedBorderColor = accentColor,
+        unfocusedBorderColor = Color(0x55FFFFFF),
+        focusedLabelColor = accentColor,
+        unfocusedLabelColor = Color(0xAAFFFFFF),
+        cursorColor = accentColor,
+        focusedPlaceholderColor = Color(0x55FFFFFF),
+        unfocusedPlaceholderColor = Color(0x55FFFFFF)
+    )
 
 @Composable
 fun SetupScreen(
@@ -53,21 +74,34 @@ fun SetupScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(bgColor)
             .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("ImmichFrame Setup", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "ImmichFrame Setup",
+            color = textColor,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            "Connect to your Immich server",
+            color = Color(0xAAFFFFFF),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 4.dp)
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedTextField(
             value = serverUrl,
             onValueChange = { serverUrl = it },
-            label = { Text("Immich Server URL") },
+            label = { Text("Server URL") },
             placeholder = { Text("https://photos.example.com") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -78,7 +112,8 @@ fun SetupScreen(
             label = { Text("API Key") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -99,26 +134,39 @@ fun SetupScreen(
                     isLoading = false
                 }
             },
-            enabled = serverUrl.isNotBlank() && apiKey.isNotBlank() && !isLoading
+            enabled = serverUrl.isNotBlank() && apiKey.isNotBlank() && !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = accentColor,
+                contentColor = Color.Black,
+                disabledContainerColor = Color(0x33FFFFFF)
+            )
         ) {
             Text("Test Connection")
         }
 
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            CircularProgressIndicator(
+                color = accentColor,
+                modifier = Modifier.padding(16.dp)
+            )
         }
 
         if (status.isNotBlank()) {
             Text(
                 text = status,
-                color = if (status.startsWith("Error")) Color.Red else Color.Green,
+                color = if (status.startsWith("Error")) Color(0xFFFF5252) else Color(0xFF69F0AE),
                 modifier = Modifier.padding(8.dp)
             )
         }
 
         if (albums.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Select albums:", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Select albums:",
+                color = textColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
 
             LazyColumn(
                 modifier = Modifier
@@ -137,9 +185,18 @@ fun SetupScreen(
                             onCheckedChange = { checked ->
                                 if (checked) selectedAlbums.add(album.id)
                                 else selectedAlbums.remove(album.id)
-                            }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = accentColor,
+                                uncheckedColor = Color(0xAAFFFFFF),
+                                checkmarkColor = Color.Black
+                            )
                         )
-                        Text("${album.albumName} (${album.assetCount})")
+                        Text(
+                            "${album.albumName} (${album.assetCount})",
+                            color = textColor,
+                            fontSize = 15.sp
+                        )
                     }
                 }
             }
@@ -153,7 +210,12 @@ fun SetupScreen(
                         onSetupComplete()
                     }
                 },
-                enabled = selectedAlbums.isNotEmpty()
+                enabled = selectedAlbums.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color(0x33FFFFFF)
+                )
             ) {
                 Text("Start")
             }
