@@ -1,14 +1,17 @@
 package com.bogocat.immichframe.ui.slideshow
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -28,13 +31,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.input.pointer.pointerInput
 import coil3.compose.AsyncImage
 import com.bogocat.immichframe.data.db.CachedAsset
-import com.bogocat.immichframe.util.ThumbHashDecoder
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.random.Random
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SlideshowScreen(
     viewModel: SlideshowViewModel = hiltViewModel(),
@@ -49,6 +53,12 @@ fun SlideshowScreen(
     val showPeople by viewModel.showPeople.collectAsState()
     val showCamera by viewModel.showCamera.collectAsState()
     val dateFormat by viewModel.dateFormat.collectAsState()
+    val crossfadeDuration by viewModel.crossfadeDuration.collectAsState()
+    val kenBurnsEnabled by viewModel.kenBurnsEnabled.collectAsState()
+    val kenBurnsZoom by viewModel.kenBurnsZoom.collectAsState()
+    val backgroundBlur by viewModel.backgroundBlur.collectAsState()
+    val imageScale by viewModel.imageScale.collectAsState()
+    val slideDuration by viewModel.state.collectAsState()
 
     // Burn-in prevention: shift content by 1-2px every 60s
     var shiftX by remember { mutableStateOf(0f) }
@@ -75,23 +85,44 @@ fun SlideshowScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Syncing photos...",
-                    color = Color.White,
-                    fontSize = 18.sp
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (state.cachedCount == 0) "Syncing photos..." else "Loading...",
+                        color = Color.White,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = "${state.cachedCount} photos cached",
+                        color = Color(0x99FFFFFF),
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    Text(
+                        text = "Long-press to open settings",
+                        color = Color(0x66FFFFFF),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
             }
         } else {
             AnimatedContent(
                 targetState = asset,
                 transitionSpec = {
-                    fadeIn(animationSpec = androidx.compose.animation.core.tween(1500)) togetherWith
-                        fadeOut(animationSpec = androidx.compose.animation.core.tween(1500))
+                    fadeIn(animationSpec = tween(crossfadeDuration)) togetherWith
+                        fadeOut(animationSpec = tween(crossfadeDuration))
                 },
                 label = "slideshow",
                 contentKey = { it.id }
             ) { displayAsset ->
-                PhotoDisplay(asset = displayAsset, durationMs = 45_000)
+                PhotoDisplay(
+                    asset = displayAsset,
+                    durationMs = 45_000,
+                    kenBurnsEnabled = kenBurnsEnabled,
+                    kenBurnsZoom = kenBurnsZoom,
+                    backgroundBlur = backgroundBlur,
+                    imageScale = imageScale
+                )
             }
 
             // Metadata overlay
@@ -108,38 +139,71 @@ fun SlideshowScreen(
             )
         }
 
-        // Touch zones: left=prev, center=pause, right=next
+        // Touch: tap=next, long-press=settings, swipe-down=settings
+        var dragTotal by remember { mutableStateOf(0f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = { dragTotal = 0f },
+                        onDragEnd = {
+                            if (dragTotal > 100f) onOpenSettings()
+                            dragTotal = 0f
+                        },
+                        onVerticalDrag = { _, dragAmount -> dragTotal += dragAmount }
+                    )
+                }
+                .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { viewModel.nextImage() }
+                    indication = null,
+                    onClick = { viewModel.nextImage() },
+                    onLongClick = { onOpenSettings() }
+                )
         )
     }
 }
 
 @Composable
-private fun PhotoDisplay(asset: CachedAsset, durationMs: Int) {
+private fun PhotoDisplay(
+    asset: CachedAsset,
+    durationMs: Int,
+    kenBurnsEnabled: Boolean,
+    kenBurnsZoom: Int,
+    backgroundBlur: Boolean,
+    imageScale: String
+) {
     val filePath = asset.filePath ?: return
+    val contentScale = if (imageScale == "fill") ContentScale.Crop else ContentScale.Fit
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Blurred background
-        AsyncImage(
-            model = File(filePath),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(20.dp)
-        )
+        if (backgroundBlur) {
+            AsyncImage(
+                model = File(filePath),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(20.dp)
+            )
+        }
 
-        // Main image with Ken Burns
-        KenBurnsImage(
-            model = File(filePath),
-            durationMs = durationMs,
-            modifier = Modifier.fillMaxSize()
-        )
+        // Main image
+        if (kenBurnsEnabled) {
+            KenBurnsImage(
+                model = File(filePath),
+                durationMs = durationMs,
+                zoomAmount = kenBurnsZoom / 100f,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            AsyncImage(
+                model = File(filePath),
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }

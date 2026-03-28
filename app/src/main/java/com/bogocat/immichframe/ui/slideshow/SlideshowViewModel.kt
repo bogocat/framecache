@@ -34,6 +34,7 @@ class SlideshowViewModel @Inject constructor(
     private val _state = MutableStateFlow(SlideshowState())
     val state: StateFlow<SlideshowState> = _state.asStateFlow()
 
+    // Overlay settings
     val showClock = settings.showClock.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val showDate = settings.showDate.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val showPhotoDate = settings.showPhotoDate.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -42,6 +43,13 @@ class SlideshowViewModel @Inject constructor(
     val showPeople = settings.showPeople.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val showCamera = settings.showCamera.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val dateFormat = settings.dateFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "MMM dd, yyyy")
+
+    // Slideshow settings
+    val crossfadeDuration = settings.crossfadeDuration.stateIn(viewModelScope, SharingStarted.Eagerly, 1500)
+    val kenBurnsEnabled = settings.kenBurnsEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val kenBurnsZoom = settings.kenBurnsZoom.stateIn(viewModelScope, SharingStarted.Eagerly, 120)
+    val backgroundBlur = settings.backgroundBlur.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val imageScale = settings.imageScale.stateIn(viewModelScope, SharingStarted.Eagerly, "fit")
 
     private var slideshowJob: Job? = null
 

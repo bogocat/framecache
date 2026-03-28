@@ -35,7 +35,11 @@ class SyncWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return try {
             val albumIds = settings.albumIds.first()
-            if (albumIds.isEmpty()) return Result.success()
+            Log.i(TAG, "Album IDs from settings: $albumIds")
+            if (albumIds.isEmpty()) {
+                Log.w(TAG, "No album IDs configured, skipping sync")
+                return Result.success()
+            }
 
             Log.i(TAG, "Starting sync for ${albumIds.size} album(s)")
 

@@ -25,8 +25,8 @@ private data class KenBurnsTarget(
     val offsetY: Float
 )
 
-private fun randomTarget() = KenBurnsTarget(
-    scale = 1.0f + Random.nextFloat() * 0.2f,
+private fun randomTarget(maxZoom: Float = 1.2f) = KenBurnsTarget(
+    scale = 1.0f + Random.nextFloat() * (maxZoom - 1.0f),
     offsetX = (Random.nextFloat() - 0.5f) * 2f,
     offsetY = (Random.nextFloat() - 0.5f) * 2f
 )
@@ -36,14 +36,15 @@ fun KenBurnsImage(
     model: Any?,
     modifier: Modifier = Modifier,
     durationMs: Int = 45_000,
+    zoomAmount: Float = 1.2f,
     contentDescription: String? = null
 ) {
-    var target by remember { mutableStateOf(randomTarget()) }
+    var target by remember { mutableStateOf(randomTarget(zoomAmount)) }
 
     val scale by animateFloatAsState(
         targetValue = target.scale,
         animationSpec = tween(durationMs, easing = LinearEasing),
-        finishedListener = { target = randomTarget() },
+        finishedListener = { target = randomTarget(zoomAmount) },
         label = "kb-scale"
     )
     val offsetX by animateFloatAsState(
@@ -59,7 +60,7 @@ fun KenBurnsImage(
 
     // Restart animation on new image
     LaunchedEffect(model) {
-        target = randomTarget()
+        target = randomTarget(zoomAmount)
     }
 
     Box(modifier = modifier.clip(RectangleShape)) {

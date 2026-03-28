@@ -24,10 +24,20 @@ class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object Keys {
+        // Connection
         val SERVER_URL = stringPreferencesKey("server_url")
         val API_KEY = stringPreferencesKey("api_key")
         val ALBUM_IDS = stringPreferencesKey("album_ids")
+
+        // Slideshow
         val DURATION = intPreferencesKey("duration")
+        val CROSSFADE_DURATION = intPreferencesKey("crossfade_duration")
+        val KEN_BURNS_ENABLED = booleanPreferencesKey("ken_burns_enabled")
+        val KEN_BURNS_ZOOM = intPreferencesKey("ken_burns_zoom")
+        val BACKGROUND_BLUR = booleanPreferencesKey("background_blur")
+        val IMAGE_SCALE = stringPreferencesKey("image_scale")
+
+        // Overlays
         val SHOW_CLOCK = booleanPreferencesKey("show_clock")
         val SHOW_DATE = booleanPreferencesKey("show_date")
         val SHOW_PHOTO_DATE = booleanPreferencesKey("show_photo_date")
@@ -36,14 +46,28 @@ class SettingsRepository @Inject constructor(
         val SHOW_PEOPLE = booleanPreferencesKey("show_people")
         val SHOW_CAMERA = booleanPreferencesKey("show_camera")
         val DATE_FORMAT = stringPreferencesKey("date_format")
+
+        // Sync
+        val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
+        val MAX_CACHED_IMAGES = intPreferencesKey("max_cached_images")
     }
 
+    // Connection
     val serverUrl: Flow<String> = context.dataStore.data.map { it[SERVER_URL] ?: "" }
     val apiKey: Flow<String> = context.dataStore.data.map { it[API_KEY] ?: "" }
     val albumIds: Flow<List<String>> = context.dataStore.data.map {
         (it[ALBUM_IDS] ?: "").split(",").filter { id -> id.isNotBlank() }
     }
+
+    // Slideshow
     val duration: Flow<Int> = context.dataStore.data.map { it[DURATION] ?: 45 }
+    val crossfadeDuration: Flow<Int> = context.dataStore.data.map { it[CROSSFADE_DURATION] ?: 1500 }
+    val kenBurnsEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEN_BURNS_ENABLED] ?: true }
+    val kenBurnsZoom: Flow<Int> = context.dataStore.data.map { it[KEN_BURNS_ZOOM] ?: 120 }
+    val backgroundBlur: Flow<Boolean> = context.dataStore.data.map { it[BACKGROUND_BLUR] ?: true }
+    val imageScale: Flow<String> = context.dataStore.data.map { it[IMAGE_SCALE] ?: "fit" }
+
+    // Overlays
     val showClock: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CLOCK] ?: true }
     val showDate: Flow<Boolean> = context.dataStore.data.map { it[SHOW_DATE] ?: true }
     val showPhotoDate: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PHOTO_DATE] ?: true }
@@ -52,6 +76,10 @@ class SettingsRepository @Inject constructor(
     val showPeople: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PEOPLE] ?: false }
     val showCamera: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CAMERA] ?: false }
     val dateFormat: Flow<String> = context.dataStore.data.map { it[DATE_FORMAT] ?: "MMM dd, yyyy" }
+
+    // Sync
+    val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[SYNC_INTERVAL_MINUTES] ?: 60 }
+    val maxCachedImages: Flow<Int> = context.dataStore.data.map { it[MAX_CACHED_IMAGES] ?: 300 }
 
     val isConfigured: Flow<Boolean> = context.dataStore.data.map {
         !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()
@@ -65,30 +93,8 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun saveDuration(seconds: Int) {
-        context.dataStore.edit { it[DURATION] = seconds }
-    }
-
-    suspend fun saveDisplaySettings(
-        showClock: Boolean,
-        showDate: Boolean,
-        showPhotoDate: Boolean,
-        showLocation: Boolean,
-        showDescription: Boolean,
-        showPeople: Boolean,
-        showCamera: Boolean,
-        dateFormat: String
-    ) {
-        context.dataStore.edit {
-            it[SHOW_CLOCK] = showClock
-            it[SHOW_DATE] = showDate
-            it[SHOW_PHOTO_DATE] = showPhotoDate
-            it[SHOW_LOCATION] = showLocation
-            it[SHOW_DESCRIPTION] = showDescription
-            it[SHOW_PEOPLE] = showPeople
-            it[SHOW_CAMERA] = showCamera
-            it[DATE_FORMAT] = dateFormat
-        }
+    suspend fun <T> save(key: Preferences.Key<T>, value: T) {
+        context.dataStore.edit { it[key] = value }
     }
 }
 
