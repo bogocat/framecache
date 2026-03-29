@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -118,18 +119,25 @@ fun SetupScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        var buttonLabel by remember { mutableStateOf("Test Connection") }
+
         Button(
             onClick = {
                 scope.launch {
                     isLoading = true
-                    status = "Connecting..."
+                    buttonLabel = "Connecting..."
+                    status = ""
                     try {
                         val api = createTestApi(serverUrl, apiKey)
+                        buttonLabel = "Reaching server..."
                         val about = api.getServerAbout()
+                        buttonLabel = "Loading albums..."
                         status = "Connected to Immich ${about.version}"
                         albums = api.getAlbums()
+                        buttonLabel = "Connected!"
                     } catch (e: Exception) {
-                        status = "Error (${e.javaClass.simpleName}): ${e.message?.take(80)}"
+                        buttonLabel = "Failed"
+                        status = "${e.javaClass.simpleName}: ${e.message?.take(100)}"
                         android.util.Log.e("SetupScreen", "Connection test failed", e)
                     }
                     isLoading = false
@@ -137,15 +145,24 @@ fun SetupScreen(
             },
             enabled = serverUrl.isNotBlank() && apiKey.isNotBlank() && !isLoading,
             colors = ButtonDefaults.buttonColors(
-                containerColor = accentColor,
+                containerColor = if (status.startsWith("Connected")) Color(0xFF69F0AE)
+                    else if (buttonLabel == "Failed") Color(0xFFFF5252)
+                    else accentColor,
                 contentColor = Color.Black,
                 disabledContainerColor = Color(0x33FFFFFF)
             )
         ) {
-            Text("Test Connection")
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.Black,
+                    modifier = Modifier.size(16.dp).padding(end = 8.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+            Text(buttonLabel)
         }
 
-        if (isLoading) {
+        if (false) { // remove standalone spinner since it's in the button now
             CircularProgressIndicator(
                 color = accentColor,
                 modifier = Modifier.padding(16.dp)
