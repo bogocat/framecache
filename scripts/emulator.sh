@@ -7,6 +7,7 @@ export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:
 export JAVA_HOME=~/Library/Java/jdk-21.0.10+7/Contents/Home
 
 PROFILE="${1:-frameo}"
+shift 2>/dev/null
 
 case "$PROFILE" in
   frameo)
