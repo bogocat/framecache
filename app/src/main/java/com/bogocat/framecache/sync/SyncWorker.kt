@@ -60,8 +60,14 @@ class SyncWorker @AssistedInject constructor(
             val cached = allAssets.map { it.toCachedAsset(albumIds.first()) }
             assetDao.insertAll(cached)
 
-            // Prune assets removed from albums
+            // Prune assets removed from albums + delete orphaned files
             val keepIds = allAssets.map { it.id }
+            val allCachedFiles = cacheManager.getAllCachedIds()
+            val orphanedFiles = allCachedFiles - keepIds.toSet()
+            for (orphanId in orphanedFiles) {
+                cacheManager.getImageFile(orphanId).delete()
+            }
+            if (orphanedFiles.isNotEmpty()) Log.i(TAG, "Deleted ${orphanedFiles.size} orphaned files")
             assetDao.pruneRemoved(keepIds)
 
             // Re-link existing files on disk (e.g., after DB migration)

@@ -49,6 +49,13 @@ class ImageCacheManager @Inject constructor(
         }
     }
 
+    fun getAllCachedIds(): Set<String> {
+        return cacheDir.listFiles()
+            ?.map { it.nameWithoutExtension }
+            ?.toSet()
+            ?: emptySet()
+    }
+
     fun getCacheSizeBytes(): Long {
         return cacheDir.listFiles()?.sumOf { it.length() } ?: 0
     }
