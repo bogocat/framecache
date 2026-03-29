@@ -73,9 +73,12 @@ class SlideshowViewModel @Inject constructor(
     fun startSlideshow() {
         slideshowJob?.cancel()
         slideshowJob = viewModelScope.launch {
-            while (assetDao.getCachedCount() == 0) {
+            var cached = assetDao.getCachedCount()
+            while (cached == 0) {
                 _state.value = _state.value.copy(cachedCount = 0)
                 delay(2000)
+                cached = assetDao.getCachedCount()
+                android.util.Log.d("Slideshow", "Waiting for cache: $cached cached")
             }
 
             val first = getNextFiltered()

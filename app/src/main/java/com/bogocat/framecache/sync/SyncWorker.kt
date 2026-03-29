@@ -64,10 +64,24 @@ class SyncWorker @AssistedInject constructor(
             val keepIds = allAssets.map { it.id }
             assetDao.pruneRemoved(keepIds)
 
-            // Download uncached images
-            val uncached = assetDao.getUncachedAssets(DOWNLOAD_BATCH_SIZE)
-            Log.i(TAG, "Downloading ${uncached.size} uncached images")
+            // Re-link existing files on disk (e.g., after DB migration)
+            val uncached = assetDao.getUncachedAssets(1000)
+            var relinked = 0
+            var toDownload = mutableListOf<CachedAsset>()
             for (asset in uncached) {
+                if (cacheManager.isAssetCached(asset.id)) {
+                    assetDao.updateFilePath(asset.id, cacheManager.getImageFile(asset.id).absolutePath)
+                    relinked++
+                } else {
+                    toDownload.add(asset)
+                }
+            }
+            if (relinked > 0) Log.i(TAG, "Re-linked $relinked existing files")
+
+            // Download truly uncached images
+            val batch = toDownload.take(DOWNLOAD_BATCH_SIZE)
+            Log.i(TAG, "Downloading ${batch.size} uncached images")
+            for (asset in batch) {
                 cacheManager.downloadAndCache(asset.id)
             }
 
