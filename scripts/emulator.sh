@@ -67,4 +67,5 @@ if ! $ANDROID_HOME/emulator/emulator -list-avds 2>/dev/null | grep -q "^${NAME}$
 fi
 
 echo "Launching $NAME (${WIDTH}x${HEIGHT})"
-exec $ANDROID_HOME/emulator/emulator -avd "$NAME" -no-boot-anim -no-audio "$@"
+# Use Google DNS so photos.bogocat.com resolves to VPS (external) not internal LAN IP
+exec $ANDROID_HOME/emulator/emulator -avd "$NAME" -no-boot-anim -no-audio -dns-server 8.8.8.8 "$@"
