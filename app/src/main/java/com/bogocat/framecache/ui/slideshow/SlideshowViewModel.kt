@@ -118,13 +118,19 @@ class SlideshowViewModel @Inject constructor(
         val favOnly = settings.favoritesOnly.first()
         val currentId = _state.value.currentAsset?.id ?: ""
 
-        return when {
+        // Try filtered query first, fall back to unfiltered if no matches
+        val filtered = when {
             favOnly -> assetDao.getNextFavorite(currentId)
             orientationFilter == "landscape" -> assetDao.getNextLandscape(currentId)
             orientationFilter == "portrait" -> assetDao.getNextPortrait(currentId)
             order == "chronological" -> assetDao.getNextChronological(currentId)
-            else -> assetDao.getNextRandom(currentId)
+            else -> null
         }
+
+        // Fall back: try without excluding current, then try unfiltered
+        return filtered
+            ?: assetDao.getNextRandom(currentId)
+            ?: assetDao.getNextRandom("")
     }
 
     private suspend fun advance() {
