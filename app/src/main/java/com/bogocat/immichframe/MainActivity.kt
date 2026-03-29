@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var cacheManager: ImageCacheManager
+    @Inject lateinit var api: com.bogocat.immichframe.api.ImmichApi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             settings = settings,
                             cacheManager = cacheManager,
+                            api = api,
                             onBack = {
                                 setShowSettings(false)
                                 SyncScheduler.triggerImmediateSync(this@MainActivity)
