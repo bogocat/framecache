@@ -5,11 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,13 +35,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import coil3.compose.AsyncImage
 import com.bogocat.framecache.data.db.CachedAsset
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.random.Random
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SlideshowScreen(
     viewModel: SlideshowViewModel = hiltViewModel(),
@@ -207,12 +205,14 @@ fun SlideshowScreen(
             )
         }
 
-        // Touch: tap=next, long-press=settings, swipe-down=settings
-        // Pause: via settings or double-tap (handled by combinedClickable delay)
+        // Touch zones: left=prev, right=next, long-press=settings, swipe-down=settings
         var dragTotalY by remember { mutableStateOf(0f) }
+        var tapX by remember { mutableStateOf(0f) }
+        var boxWidth by remember { mutableStateOf(1f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .onSizeChanged { boxWidth = it.width.toFloat() }
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onDragStart = { dragTotalY = 0f },
@@ -223,12 +223,18 @@ fun SlideshowScreen(
                         onVerticalDrag = { _, dragAmount -> dragTotalY += dragAmount }
                     )
                 }
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = { viewModel.nextImage() },
-                    onLongClick = { onOpenSettings() }
-                )
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            if (offset.x < boxWidth * 0.33f) {
+                                viewModel.previousImage()
+                            } else {
+                                viewModel.nextImage()
+                            }
+                        },
+                        onLongPress = { onOpenSettings() }
+                    )
+                }
         )
     }
 }
