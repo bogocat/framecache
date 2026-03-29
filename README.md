@@ -1,18 +1,20 @@
-# ImmichFrame
+# FrameCache
 
-Offline-first photo frame app for [Immich](https://immich.app). Native Android — caches photos locally so WiFi drops are invisible.
+Offline-first digital photo frame for Android. Caches photos locally so WiFi drops are invisible.
+
+> **Currently supports [Immich](https://immich.app).** Not affiliated with or endorsed by the Immich project.
 
 ## Why?
 
-Existing Immich photo frame solutions ([ImmichFrame](https://github.com/immichFrame/ImmichFrame), [ImmichKiosk](https://github.com/damongolding/immich-kiosk)) are web-based. Every image requires an active connection between the device's browser and the server. On cheap photo frame hardware (Frameo, budget tablets) with weak WiFi, a single dropped request shows an error screen or kills the slideshow entirely.
+Existing photo frame solutions ([ImmichFrame](https://github.com/immichFrame/ImmichFrame), [ImmichKiosk](https://github.com/damongolding/immich-kiosk)) are web-based. Every image requires an active connection between the device's browser and the server. On cheap photo frame hardware (Frameo, budget tablets) with weak WiFi, a single dropped request shows an error screen or kills the slideshow entirely.
 
-ImmichFrame takes a different approach: **sync and display are completely decoupled.** The display layer reads only from local cache. The sync layer runs in the background when WiFi is available. WiFi can be gone for days and the frame keeps cycling through cached photos.
+FrameCache takes a different approach: **sync and display are completely decoupled.** The display layer reads only from local cache. The sync layer runs in the background when WiFi is available. WiFi can be gone for days and the frame keeps cycling through cached photos.
 
 ```
-Existing:  Device browser ←—WiFi (every image)—→ Web server ←→ Immich
-This app:  Device app ←—reads local disk—→ [cached JPEGs + Room DB]
+Web-based:  Device browser ←—WiFi (every image)—→ Web server ←→ Photo library
+FrameCache: Device app ←—reads local disk—→ [cached JPEGs + Room DB]
                                               ↑
-                                    WorkManager (WiFi when available) → Immich API
+                                    WorkManager (WiFi when available) → Photo library API
 ```
 
 ## Features
@@ -60,7 +62,7 @@ Launch the app, enter your Immich server URL and API key, select albums, tap Sta
 **Option B: ADB (no typing on device)**
 
 ```bash
-adb shell am start -n com.bogocat.immichframe/.MainActivity \
+adb shell am start -n com.bogocat.framecache/.MainActivity \
   --es server_url "https://photos.example.com" \
   --es api_key "your-immich-api-key" \
   --es album_ids "album-uuid-1,album-uuid-2"
@@ -91,12 +93,16 @@ Swipe down or long-press on the slideshow to open settings.
 - **Room** for asset metadata (IDs, EXIF, display history)
 - **WorkManager** for background sync (WiFi-only constraint)
 - **DataStore** for settings
-- **Retrofit + OkHttp** for Immich API
+- **Retrofit + OkHttp** for API communication
 - **Hilt** for dependency injection
 
-The app talks directly to the Immich API — no middleware server needed. It uses `GET /api/albums/{id}` to list assets and `GET /api/assets/{id}/thumbnail?size=preview` to download 1440px JPEG previews.
+### Photo Sources
 
-Note: `POST /search/random` doesn't work for shared-album users, which is why we fetch the full album and randomize client-side.
+Currently supports **Immich** via its REST API (`GET /api/albums/{id}`, `GET /api/assets/{id}/thumbnail`).
+
+The sync and display layers are decoupled — adding new photo sources (Google Photos, Synology Photos, PhotoPrism, local folders, etc.) would mean implementing a new sync adapter without touching the display code.
+
+> Note: `POST /search/random` doesn't work for shared-album users in Immich, which is why we fetch the full album and randomize client-side.
 
 ## Requirements
 

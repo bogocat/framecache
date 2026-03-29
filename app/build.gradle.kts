@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.bogocat.immichframe"
+    namespace = "com.bogocat.framecache"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bogocat.immichframe"
+        applicationId = "com.bogocat.framecache"
         minSdk = 23
         targetSdk = 35
         versionCode = 1

@@ -6,9 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:name=".ImmichFrameApp"
+        android:name=".FrameCacheApp"
         android:allowBackup="true"
-        android:label="ImmichFrame"
+        android:label="FrameCache"
         android:largeHeap="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.ImmichFrame">
