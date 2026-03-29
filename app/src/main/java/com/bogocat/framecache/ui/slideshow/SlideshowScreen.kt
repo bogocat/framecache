@@ -207,9 +207,9 @@ fun SlideshowScreen(
             )
         }
 
-        // Touch: tap=next, double-tap=pause, long-press=settings, swipe-down=settings
+        // Touch: tap=next, long-press=settings, swipe-down=settings
+        // Pause: via settings or double-tap (handled by combinedClickable delay)
         var dragTotalY by remember { mutableStateOf(0f) }
-        var dragTotalX by remember { mutableStateOf(0f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -227,7 +227,6 @@ fun SlideshowScreen(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = { viewModel.nextImage() },
-                    onDoubleClick = { viewModel.togglePause() },
                     onLongClick = { onOpenSettings() }
                 )
         )

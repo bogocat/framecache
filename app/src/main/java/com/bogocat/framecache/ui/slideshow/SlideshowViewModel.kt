@@ -113,13 +113,14 @@ class SlideshowViewModel @Inject constructor(
         val order = settings.photoOrder.first()
         val orientationFilter = settings.photoOrientationFilter.first()
         val favOnly = settings.favoritesOnly.first()
+        val currentId = _state.value.currentAsset?.id ?: ""
 
         return when {
-            favOnly -> assetDao.getNextFavorite()
-            orientationFilter == "landscape" -> assetDao.getNextLandscape()
-            orientationFilter == "portrait" -> assetDao.getNextPortrait()
-            order == "chronological" -> assetDao.getNextChronological()
-            else -> assetDao.getNextRandom()
+            favOnly -> assetDao.getNextFavorite(currentId)
+            orientationFilter == "landscape" -> assetDao.getNextLandscape(currentId)
+            orientationFilter == "portrait" -> assetDao.getNextPortrait(currentId)
+            order == "chronological" -> assetDao.getNextChronological(currentId)
+            else -> assetDao.getNextRandom(currentId)
         }
     }
 

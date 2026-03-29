@@ -8,25 +8,20 @@ import androidx.room.Query
 @Dao
 interface AssetDao {
 
-    // Random weighted (least shown first)
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL ORDER BY displayCount ASC, RANDOM() LIMIT 1")
-    suspend fun getNextRandom(): CachedAsset?
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextRandom(excludeId: String = ""): CachedAsset?
 
-    // Chronological
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
-    suspend fun getNextChronological(): CachedAsset?
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    suspend fun getNextChronological(excludeId: String = ""): CachedAsset?
 
-    // Favorites only
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 ORDER BY displayCount ASC, RANDOM() LIMIT 1")
-    suspend fun getNextFavorite(): CachedAsset?
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextFavorite(excludeId: String = ""): CachedAsset?
 
-    // Landscape only
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height ORDER BY displayCount ASC, RANDOM() LIMIT 1")
-    suspend fun getNextLandscape(): CachedAsset?
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextLandscape(excludeId: String = ""): CachedAsset?
 
-    // Portrait only
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width ORDER BY displayCount ASC, RANDOM() LIMIT 1")
-    suspend fun getNextPortrait(): CachedAsset?
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextPortrait(excludeId: String = ""): CachedAsset?
 
     @Query("UPDATE cached_assets SET displayCount = displayCount + 1, lastDisplayed = :now WHERE id = :id")
     suspend fun markDisplayed(id: String, now: Long = System.currentTimeMillis())
