@@ -36,6 +36,13 @@ class SettingsRepository @Inject constructor(
         val KEN_BURNS_ZOOM = intPreferencesKey("ken_burns_zoom")
         val BACKGROUND_BLUR = booleanPreferencesKey("background_blur")
         val IMAGE_SCALE = stringPreferencesKey("image_scale")
+        val SHOW_PROGRESS_BAR = booleanPreferencesKey("show_progress_bar")
+        val PHOTO_ORDER = stringPreferencesKey("photo_order")
+        val PHOTO_ORIENTATION_FILTER = stringPreferencesKey("photo_orientation_filter")
+        val FAVORITES_ONLY = booleanPreferencesKey("favorites_only")
+        val CLOCK_FORMAT = stringPreferencesKey("clock_format")
+        val SHOW_RATING = booleanPreferencesKey("show_rating")
+        val SHOW_PERSON_AGE = booleanPreferencesKey("show_person_age")
 
         // Overlays
         val SHOW_CLOCK = booleanPreferencesKey("show_clock")
@@ -76,6 +83,13 @@ class SettingsRepository @Inject constructor(
     val kenBurnsZoom: Flow<Int> = context.dataStore.data.map { it[KEN_BURNS_ZOOM] ?: 120 }
     val backgroundBlur: Flow<Boolean> = context.dataStore.data.map { it[BACKGROUND_BLUR] ?: true }
     val imageScale: Flow<String> = context.dataStore.data.map { it[IMAGE_SCALE] ?: "fit" }
+    val showProgressBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PROGRESS_BAR] ?: false }
+    val photoOrder: Flow<String> = context.dataStore.data.map { it[PHOTO_ORDER] ?: "random" }
+    val photoOrientationFilter: Flow<String> = context.dataStore.data.map { it[PHOTO_ORIENTATION_FILTER] ?: "all" }
+    val favoritesOnly: Flow<Boolean> = context.dataStore.data.map { it[FAVORITES_ONLY] ?: false }
+    val clockFormat: Flow<String> = context.dataStore.data.map { it[CLOCK_FORMAT] ?: "12" }
+    val showRating: Flow<Boolean> = context.dataStore.data.map { it[SHOW_RATING] ?: false }
+    val showPersonAge: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PERSON_AGE] ?: false }
 
     // Overlays
     val showClock: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CLOCK] ?: true }

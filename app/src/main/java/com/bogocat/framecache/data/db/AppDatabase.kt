@@ -11,7 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Database(entities = [CachedAsset::class], version = 1, exportSchema = false)
+@Database(entities = [CachedAsset::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun assetDao(): AssetDao
 }
@@ -26,8 +26,8 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
-            "immichframe.db"
-        ).build()
+            "framecache.db"
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

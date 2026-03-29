@@ -84,6 +84,13 @@ fun SettingsScreen(
     val kenBurnsZoom by settings.kenBurnsZoom.collectAsState(initial = 120)
     val backgroundBlur by settings.backgroundBlur.collectAsState(initial = true)
     val imageScale by settings.imageScale.collectAsState(initial = "fit")
+    val showProgressBar by settings.showProgressBar.collectAsState(initial = false)
+    val photoOrder by settings.photoOrder.collectAsState(initial = "random")
+    val orientationFilter by settings.photoOrientationFilter.collectAsState(initial = "all")
+    val favoritesOnly by settings.favoritesOnly.collectAsState(initial = false)
+    val clockFormat by settings.clockFormat.collectAsState(initial = "12")
+    val showRating by settings.showRating.collectAsState(initial = false)
+    val showPersonAge by settings.showPersonAge.collectAsState(initial = false)
     val showClock by settings.showClock.collectAsState(initial = true)
     val showDate by settings.showDate.collectAsState(initial = true)
     val showPhotoDate by settings.showPhotoDate.collectAsState(initial = true)
@@ -283,11 +290,81 @@ fun SettingsScreen(
         SettingsToggle("Fill Screen (crop)", imageScale == "fill") {
             scope.launch { settings.save(SettingsRepository.IMAGE_SCALE, if (it) "fill" else "fit") }
         }
+        SettingsToggle("Progress Bar", showProgressBar) {
+            scope.launch { settings.save(SettingsRepository.SHOW_PROGRESS_BAR, it) }
+        }
+
+        // Photo order
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Order", color = textColor, fontSize = 16.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("random" to "Random", "chronological" to "Date").forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { scope.launch { settings.save(SettingsRepository.PHOTO_ORDER, value) } },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (photoOrder == value) Color.Black else textColor,
+                            containerColor = if (photoOrder == value) sectionColor else Color.Transparent
+                        ),
+                        modifier = Modifier.height(36.dp)
+                    ) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
+
+        // Orientation filter
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Photos", color = textColor, fontSize = 16.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("all" to "All", "landscape" to "Landscape", "portrait" to "Portrait").forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { scope.launch { settings.save(SettingsRepository.PHOTO_ORIENTATION_FILTER, value) } },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (orientationFilter == value) Color.Black else textColor,
+                            containerColor = if (orientationFilter == value) sectionColor else Color.Transparent
+                        ),
+                        modifier = Modifier.height(36.dp)
+                    ) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
+
+        SettingsToggle("Favorites Only", favoritesOnly) {
+            scope.launch { settings.save(SettingsRepository.FAVORITES_ONLY, it) }
+        }
 
         SectionDivider()
 
         // ── Overlays ──
         SectionHeader("Overlays")
+
+        // Clock format
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Clock", color = textColor, fontSize = 16.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("12" to "12h", "24" to "24h").forEach { (value, label) ->
+                    OutlinedButton(
+                        onClick = { scope.launch { settings.save(SettingsRepository.CLOCK_FORMAT, value) } },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (clockFormat == value) Color.Black else textColor,
+                            containerColor = if (clockFormat == value) sectionColor else Color.Transparent
+                        ),
+                        modifier = Modifier.height(36.dp)
+                    ) { Text(label, fontSize = 12.sp) }
+                }
+            }
+        }
         SettingsToggle("Clock", showClock) { scope.launch { settings.save(SettingsRepository.SHOW_CLOCK, it) } }
         SettingsToggle("Current Date", showDate) { scope.launch { settings.save(SettingsRepository.SHOW_DATE, it) } }
         SettingsToggle("Photo Date", showPhotoDate) { scope.launch { settings.save(SettingsRepository.SHOW_PHOTO_DATE, it) } }
@@ -295,6 +372,8 @@ fun SettingsScreen(
         SettingsToggle("Description", showDescription) { scope.launch { settings.save(SettingsRepository.SHOW_DESCRIPTION, it) } }
         SettingsToggle("People", showPeople) { scope.launch { settings.save(SettingsRepository.SHOW_PEOPLE, it) } }
         SettingsToggle("Camera", showCamera) { scope.launch { settings.save(SettingsRepository.SHOW_CAMERA, it) } }
+        SettingsToggle("Star Rating", showRating) { scope.launch { settings.save(SettingsRepository.SHOW_RATING, it) } }
+        SettingsToggle("Person Age", showPersonAge) { scope.launch { settings.save(SettingsRepository.SHOW_PERSON_AGE, it) } }
 
         SectionDivider()
 

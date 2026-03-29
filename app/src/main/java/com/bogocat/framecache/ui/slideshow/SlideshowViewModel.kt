@@ -19,10 +19,9 @@ import javax.inject.Inject
 
 data class SlideshowState(
     val currentAsset: CachedAsset? = null,
-    val nextAsset: CachedAsset? = null,
-    val isTransitioning: Boolean = false,
     val cachedCount: Int = 0,
-    val isPaused: Boolean = false
+    val isPaused: Boolean = false,
+    val progress: Float = 0f
 )
 
 @HiltViewModel
@@ -43,6 +42,9 @@ class SlideshowViewModel @Inject constructor(
     val showPeople = settings.showPeople.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val showCamera = settings.showCamera.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val dateFormat = settings.dateFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "MMM dd, yyyy")
+    val showRating = settings.showRating.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val showPersonAge = settings.showPersonAge.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val clockFormat = settings.clockFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "12")
 
     // Slideshow settings
     val crossfadeDuration = settings.crossfadeDuration.stateIn(viewModelScope, SharingStarted.Eagerly, 1500)
@@ -50,12 +52,17 @@ class SlideshowViewModel @Inject constructor(
     val kenBurnsZoom = settings.kenBurnsZoom.stateIn(viewModelScope, SharingStarted.Eagerly, 120)
     val backgroundBlur = settings.backgroundBlur.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val imageScale = settings.imageScale.stateIn(viewModelScope, SharingStarted.Eagerly, "fit")
+    val showProgressBar = settings.showProgressBar.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // Sleep
     val sleepEnabled = settings.sleepEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val sleepStartHour = settings.sleepStartHour.stateIn(viewModelScope, SharingStarted.Eagerly, 22)
     val sleepEndHour = settings.sleepEndHour.stateIn(viewModelScope, SharingStarted.Eagerly, 7)
     val sleepDim = settings.sleepDim.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    // History for previous
+    private val history = mutableListOf<CachedAsset>()
+    private var historyIndex = -1
 
     private var slideshowJob: Job? = null
 
@@ -66,30 +73,35 @@ class SlideshowViewModel @Inject constructor(
     fun startSlideshow() {
         slideshowJob?.cancel()
         slideshowJob = viewModelScope.launch {
-            // Wait for cache to have images
             while (assetDao.getCachedCount() == 0) {
                 _state.value = _state.value.copy(cachedCount = 0)
                 delay(2000)
             }
 
-            // Load first image
-            val first = assetDao.getNextAsset()
+            val first = getNextFiltered()
             if (first != null) {
                 assetDao.markDisplayed(first.id)
+                history.add(first)
+                historyIndex = 0
                 _state.value = _state.value.copy(
                     currentAsset = first,
                     cachedCount = assetDao.getCachedCount()
                 )
             }
 
-            // Slideshow loop
+            // Slideshow loop with progress tracking
             while (true) {
                 val duration = settings.duration.first()
-                delay(duration * 1000L)
+                val stepMs = 100L
+                val totalSteps = (duration * 1000L) / stepMs
 
-                if (_state.value.isPaused) {
-                    delay(1000)
-                    continue
+                for (step in 0..totalSteps) {
+                    if (_state.value.isPaused) {
+                        delay(stepMs)
+                        continue
+                    }
+                    _state.value = _state.value.copy(progress = step.toFloat() / totalSteps)
+                    delay(stepMs)
                 }
 
                 advance()
@@ -97,19 +109,37 @@ class SlideshowViewModel @Inject constructor(
         }
     }
 
+    private suspend fun getNextFiltered(): CachedAsset? {
+        val order = settings.photoOrder.first()
+        val orientationFilter = settings.photoOrientationFilter.first()
+        val favOnly = settings.favoritesOnly.first()
+
+        return when {
+            favOnly -> assetDao.getNextFavorite()
+            orientationFilter == "landscape" -> assetDao.getNextLandscape()
+            orientationFilter == "portrait" -> assetDao.getNextPortrait()
+            order == "chronological" -> assetDao.getNextChronological()
+            else -> assetDao.getNextRandom()
+        }
+    }
+
     private suspend fun advance() {
-        val next = assetDao.getNextAsset() ?: return
+        val next = getNextFiltered() ?: return
         assetDao.markDisplayed(next.id)
 
-        // Check if all images have been shown at least once
-        val minCount = _state.value.currentAsset?.displayCount ?: 0
-        if (minCount > 5) {
-            assetDao.resetDisplayCounts()
+        // Add to history (keep last 50)
+        if (historyIndex < history.size - 1) {
+            // Trim future if we navigated back then advanced
+            while (history.size > historyIndex + 1) history.removeAt(history.size - 1)
         }
+        history.add(next)
+        if (history.size > 50) history.removeAt(0)
+        historyIndex = history.size - 1
 
         _state.value = _state.value.copy(
             currentAsset = next,
-            cachedCount = assetDao.getCachedCount()
+            cachedCount = assetDao.getCachedCount(),
+            progress = 0f
         )
     }
 
@@ -122,7 +152,12 @@ class SlideshowViewModel @Inject constructor(
     }
 
     fun previousImage() {
-        // For now, just advance (would need history stack for true previous)
-        viewModelScope.launch { advance() }
+        viewModelScope.launch {
+            if (historyIndex > 0) {
+                historyIndex--
+                val prev = history[historyIndex]
+                _state.value = _state.value.copy(currentAsset = prev, progress = 0f)
+            }
+        }
     }
 }

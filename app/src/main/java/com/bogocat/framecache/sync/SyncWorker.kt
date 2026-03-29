@@ -99,9 +99,24 @@ class SyncWorker @AssistedInject constructor(
             ?.mapNotNull { it.name?.takeIf { n -> n.isNotBlank() } }
             ?.joinToString(", ")
             ?.ifBlank { null }
+        // Dedup camera make/model ("Canon Canon EOS 5D" -> "Canon EOS 5D")
         val camera = exifInfo?.let {
-            listOfNotNull(it.make, it.model).joinToString(" ").ifBlank { null }
+            val make = it.make?.trim()
+            val model = it.model?.trim()
+            when {
+                make == null && model == null -> null
+                make == null -> model
+                model == null -> make
+                model.startsWith(make, ignoreCase = true) -> model
+                else -> "$make $model"
+            }
         }
+
+        // Person birth dates for age calculation
+        val birthDates = people
+            ?.mapNotNull { p -> p.name?.let { name -> p.birthDate?.let { bd -> "$name=$bd" } } }
+            ?.joinToString(";")
+            ?.ifBlank { null }
 
         return CachedAsset(
             id = id,
@@ -112,6 +127,9 @@ class SyncWorker @AssistedInject constructor(
             description = exifInfo?.description?.takeIf { it.isNotBlank() },
             cameraModel = camera,
             peopleName = peopleNames,
+            peopleBirthDates = birthDates,
+            rating = exifInfo?.rating,
+            isFavorite = isFavorite,
             width = width,
             height = height
         )

@@ -13,6 +13,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -25,7 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -58,6 +63,10 @@ fun SlideshowScreen(
     val kenBurnsZoom by viewModel.kenBurnsZoom.collectAsState()
     val backgroundBlur by viewModel.backgroundBlur.collectAsState()
     val imageScale by viewModel.imageScale.collectAsState()
+    val showProgressBar by viewModel.showProgressBar.collectAsState()
+    val showRating by viewModel.showRating.collectAsState()
+    val showPersonAge by viewModel.showPersonAge.collectAsState()
+    val clockFormat by viewModel.clockFormat.collectAsState()
     val sleepEnabled by viewModel.sleepEnabled.collectAsState()
     val sleepStartHour by viewModel.sleepStartHour.collectAsState()
     val sleepEndHour by viewModel.sleepEndHour.collectAsState()
@@ -156,8 +165,37 @@ fun SlideshowScreen(
                 showDescription = showDescription,
                 showPeople = showPeople,
                 showCamera = showCamera,
+                showRating = showRating,
+                showPersonAge = showPersonAge,
+                clockFormat = clockFormat,
                 dateFormat = dateFormat
             )
+
+            // Progress bar
+            if (showProgressBar) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .height(2.dp),
+                    color = Color.White.copy(alpha = 0.5f),
+                    trackColor = Color.Transparent
+                )
+            }
+
+            // Pause indicator
+            if (state.isPaused) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xAA000000))
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                ) {
+                    Text("PAUSED", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         // Sleep overlay
@@ -169,25 +207,27 @@ fun SlideshowScreen(
             )
         }
 
-        // Touch: tap=next, long-press=settings, swipe-down=settings
-        var dragTotal by remember { mutableStateOf(0f) }
+        // Touch: tap=next, double-tap=pause, long-press=settings, swipe-down=settings
+        var dragTotalY by remember { mutableStateOf(0f) }
+        var dragTotalX by remember { mutableStateOf(0f) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
-                        onDragStart = { dragTotal = 0f },
+                        onDragStart = { dragTotalY = 0f },
                         onDragEnd = {
-                            if (dragTotal > 100f) onOpenSettings()
-                            dragTotal = 0f
+                            if (dragTotalY > 100f) onOpenSettings()
+                            dragTotalY = 0f
                         },
-                        onVerticalDrag = { _, dragAmount -> dragTotal += dragAmount }
+                        onVerticalDrag = { _, dragAmount -> dragTotalY += dragAmount }
                     )
                 }
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = { viewModel.nextImage() },
+                    onDoubleClick = { viewModel.togglePause() },
                     onLongClick = { onOpenSettings() }
                 )
         )

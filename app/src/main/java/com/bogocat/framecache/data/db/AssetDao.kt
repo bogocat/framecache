@@ -8,8 +8,25 @@ import androidx.room.Query
 @Dao
 interface AssetDao {
 
+    // Random weighted (least shown first)
     @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL ORDER BY displayCount ASC, RANDOM() LIMIT 1")
-    suspend fun getNextAsset(): CachedAsset?
+    suspend fun getNextRandom(): CachedAsset?
+
+    // Chronological
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    suspend fun getNextChronological(): CachedAsset?
+
+    // Favorites only
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextFavorite(): CachedAsset?
+
+    // Landscape only
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextLandscape(): CachedAsset?
+
+    // Portrait only
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextPortrait(): CachedAsset?
 
     @Query("UPDATE cached_assets SET displayCount = displayCount + 1, lastDisplayed = :now WHERE id = :id")
     suspend fun markDisplayed(id: String, now: Long = System.currentTimeMillis())

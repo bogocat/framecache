@@ -1,7 +1,6 @@
 package com.bogocat.framecache.ui.slideshow
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.bogocat.framecache.data.db.CachedAsset
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -51,6 +51,9 @@ fun MetadataOverlay(
     showDescription: Boolean,
     showPeople: Boolean,
     showCamera: Boolean,
+    showRating: Boolean = false,
+    showPersonAge: Boolean = false,
+    clockFormat: String = "12",
     dateFormat: String,
     modifier: Modifier = Modifier
 ) {
@@ -70,8 +73,9 @@ fun MetadataOverlay(
             Pill(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
                 Column {
                     if (showClock) {
+                        val clockFmt = if (clockFormat == "24") "HH:mm" else "h:mm a"
                         Text(
-                            text = SimpleDateFormat("h:mm a", Locale.getDefault())
+                            text = SimpleDateFormat(clockFmt, Locale.getDefault())
                                 .format(Date(currentTime)),
                             color = Color.White,
                             fontSize = 22.sp,
@@ -89,17 +93,23 @@ fun MetadataOverlay(
             }
         }
 
-        // Top-right: people
+        // Top-right: people (with optional age)
         if (showPeople && asset?.peopleName != null) {
+            val peopleText = if (showPersonAge && asset.peopleBirthDates != null && asset.dateTaken != null) {
+                formatPeopleWithAge(asset.peopleName, asset.peopleBirthDates, asset.dateTaken)
+            } else {
+                asset.peopleName
+            }
             Pill(modifier = Modifier.align(Alignment.TopEnd).padding(20.dp)) {
-                Text(text = asset.peopleName, color = Color.White, fontSize = 14.sp)
+                Text(text = peopleText, color = Color.White, fontSize = 14.sp)
             }
         }
 
-        // Bottom-left: photo info (date, location, camera)
+        // Bottom-left: photo info (date, location, camera, rating)
         val hasPhotoInfo = (showPhotoDate && asset?.dateTaken != null) ||
             (showLocation && asset?.location != null) ||
-            (showCamera && asset?.cameraModel != null)
+            (showCamera && asset?.cameraModel != null) ||
+            (showRating && asset?.rating != null && asset.rating > 0)
 
         if (hasPhotoInfo) {
             Pill(modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)) {
@@ -125,6 +135,13 @@ fun MetadataOverlay(
                             fontSize = 11.sp
                         )
                     }
+                    if (showRating && asset?.rating != null && asset.rating > 0) {
+                        Text(
+                            text = "\u2605".repeat(asset.rating) + "\u2606".repeat(5 - asset.rating),
+                            color = Color(0xFFFFD700),
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }
@@ -147,5 +164,28 @@ private fun formatDate(format: String, millis: Long): String {
         SimpleDateFormat(format, Locale.getDefault()).format(Date(millis))
     } catch (_: Exception) {
         SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(millis))
+    }
+}
+
+private fun formatPeopleWithAge(names: String, birthDates: String, photoDateMillis: Long): String {
+    // birthDates format: "Alice=1990-01-15;Bob=1988-06-20"
+    val bdMap = birthDates.split(";").associate { entry ->
+        val parts = entry.split("=", limit = 2)
+        parts[0] to parts.getOrElse(1) { "" }
+    }
+    val photoCal = Calendar.getInstance().apply { timeInMillis = photoDateMillis }
+
+    return names.split(", ").joinToString(", ") { name ->
+        val bd = bdMap[name]
+        if (bd != null) {
+            try {
+                val birthCal = Calendar.getInstance().apply {
+                    time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(bd)!!
+                }
+                var age = photoCal.get(Calendar.YEAR) - birthCal.get(Calendar.YEAR)
+                if (photoCal.get(Calendar.DAY_OF_YEAR) < birthCal.get(Calendar.DAY_OF_YEAR)) age--
+                if (age >= 0) "$name ($age)" else name
+            } catch (_: Exception) { name }
+        } else name
     }
 }
