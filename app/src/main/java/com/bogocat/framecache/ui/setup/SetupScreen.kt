@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -76,8 +76,9 @@ fun SetupScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(bgColor)
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(32.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = if (albums.isEmpty()) Arrangement.Center else Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -191,12 +192,8 @@ fun SetupScreen(
                 fontWeight = FontWeight.Medium
             )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-            ) {
-                items(albums) { album ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                albums.forEach { album ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
