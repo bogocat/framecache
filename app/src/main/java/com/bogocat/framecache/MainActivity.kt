@@ -58,21 +58,6 @@ class MainActivity : ComponentActivity() {
             FrameCacheTheme {
                 val isConfigured by settings.isConfigured.collectAsState(initial = false)
                 val (showSettings, setShowSettings) = remember { mutableStateOf(false) }
-                val orientationLock by settings.orientationLock.collectAsState(initial = "auto")
-
-                // Apply orientation lock (only if device supports it)
-                androidx.compose.runtime.LaunchedEffect(orientationLock) {
-                    try {
-                        requestedOrientation = when (orientationLock) {
-                            "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                            "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                            else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                        }
-                    } catch (_: Exception) {
-                        // Some devices/emulators don't support forced orientation
-                    }
-                }
-
                 when {
                     !isConfigured -> {
                         SetupScreen(

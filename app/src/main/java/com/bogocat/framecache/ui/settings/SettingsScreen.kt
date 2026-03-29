@@ -105,7 +105,7 @@ fun SettingsScreen(
     val sleepStartHour by settings.sleepStartHour.collectAsState(initial = 22)
     val sleepEndHour by settings.sleepEndHour.collectAsState(initial = 7)
     val sleepDim by settings.sleepDim.collectAsState(initial = true)
-    val orientationLock by settings.orientationLock.collectAsState(initial = "auto")
+    // orientationLock removed — Frameo devices have fixed orientations
 
     // Connection editing state
     var isEditing by remember { mutableStateOf(false) }
@@ -436,30 +436,6 @@ fun SettingsScreen(
             }
             SettingsToggle("Dim (vs black)", sleepDim) {
                 scope.launch { settings.save(SettingsRepository.SLEEP_DIM, it) }
-            }
-        }
-
-        SectionDivider()
-
-        // ── Display ──
-        SectionHeader("Display")
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Orientation", color = textColor, fontSize = 16.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("auto" to "Auto", "landscape" to "Landscape", "portrait" to "Portrait").forEach { (value, label) ->
-                    OutlinedButton(
-                        onClick = { scope.launch { settings.save(SettingsRepository.ORIENTATION_LOCK, value) } },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (orientationLock == value) Color.Black else textColor,
-                            containerColor = if (orientationLock == value) sectionColor else Color.Transparent
-                        ),
-                        modifier = Modifier.height(36.dp)
-                    ) { Text(label, fontSize = 12.sp) }
-                }
             }
         }
 
