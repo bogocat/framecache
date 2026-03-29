@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
@@ -81,6 +83,33 @@ fun SetupScreen(
         verticalArrangement = if (albums.isEmpty()) Arrangement.Center else Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // WiFi / Android settings access
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xAAFFFFFF))
+            ) { Text("WiFi", color = Color(0xAAFFFFFF), fontSize = 12.sp) }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xAAFFFFFF))
+            ) { Text("Settings", color = Color(0xAAFFFFFF), fontSize = 12.sp) }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             "FrameCache Setup",
             color = textColor,
