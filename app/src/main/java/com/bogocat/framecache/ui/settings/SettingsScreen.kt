@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -112,6 +113,9 @@ fun SettingsScreen(
     var editUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
     var editApiKey by remember(apiKey) { mutableStateOf(apiKey) }
     var editAlbums by remember(albumIdsRaw) { mutableStateOf(albumIdsRaw.joinToString(",")) }
+    var fetchedAlbums by remember { mutableStateOf<List<com.bogocat.framecache.api.model.AlbumResponse>>(emptyList()) }
+    val selectedAlbumIds = remember { mutableStateListOf<String>() }
+    var albumsLoading by remember { mutableStateOf(false) }
 
     // Connection test state
     var connStatus by remember { mutableStateOf("") }
@@ -213,26 +217,83 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
-                value = editAlbums,
-                onValueChange = { editAlbums = it },
-                label = { Text("Album IDs (comma-separated)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = fieldColors
-            )
+            // Album picker
+            Spacer(modifier = Modifier.height(4.dp))
+            if (fetchedAlbums.isEmpty() && !albumsLoading) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            albumsLoading = true
+                            try {
+                                // Create a temporary API client with the edited credentials
+                                val testClient = okhttp3.OkHttpClient.Builder()
+                                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    .addInterceptor { chain ->
+                                        chain.proceed(chain.request().newBuilder()
+                                            .addHeader("x-api-key", editApiKey).build())
+                                    }.build()
+                                val testApi = retrofit2.Retrofit.Builder()
+                                    .baseUrl(if (editUrl.endsWith("/")) editUrl else "$editUrl/")
+                                    .client(testClient)
+                                    .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+                                    .build()
+                                    .create(com.bogocat.framecache.api.ImmichApi::class.java)
+                                fetchedAlbums = testApi.getAlbums()
+                                // Pre-select currently configured albums
+                                selectedAlbumIds.clear()
+                                selectedAlbumIds.addAll(albumIdsRaw)
+                            } catch (e: Exception) {
+                                connStatus = "Error loading albums: ${e.message?.take(50)}"
+                            }
+                            albumsLoading = false
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = sectionColor)
+                ) { Text("Load Albums", color = sectionColor) }
+            } else if (albumsLoading) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(color = sectionColor, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text("Loading albums...", color = subtextColor, fontSize = 13.sp)
+                }
+            } else {
+                Text("Select albums:", color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                fetchedAlbums.forEach { album ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = album.id in selectedAlbumIds,
+                            onCheckedChange = { checked ->
+                                if (checked) selectedAlbumIds.add(album.id)
+                                else selectedAlbumIds.remove(album.id)
+                            },
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                checkedColor = sectionColor,
+                                uncheckedColor = subtextColor,
+                                checkmarkColor = Color.Black
+                            )
+                        )
+                        Text("${album.albumName} (${album.assetCount})", color = textColor, fontSize = 14.sp)
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
                         scope.launch {
-                            settings.saveServerConfig(
-                                editUrl,
-                                editApiKey,
+                            val albumIds = if (fetchedAlbums.isNotEmpty()) {
+                                selectedAlbumIds.toList()
+                            } else {
                                 editAlbums.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                            )
+                            }
+                            settings.saveServerConfig(editUrl, editApiKey, albumIds)
                             isEditing = false
+                            fetchedAlbums = emptyList()
                             // Re-test connection
                             connTesting = true
                             try {
@@ -258,6 +319,7 @@ fun SettingsScreen(
                         editUrl = serverUrl
                         editApiKey = apiKey
                         editAlbums = albumIdsRaw.joinToString(",")
+                        fetchedAlbums = emptyList()
                         isEditing = false
                     },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
