@@ -129,7 +129,8 @@ fun SetupScreen(
                         status = "Connected to Immich ${about.version}"
                         albums = api.getAlbums()
                     } catch (e: Exception) {
-                        status = "Error: ${e.message}"
+                        status = "Error (${e.javaClass.simpleName}): ${e.message?.take(80)}"
+                        android.util.Log.e("SetupScreen", "Connection test failed", e)
                     }
                     isLoading = false
                 }
@@ -155,7 +156,12 @@ fun SetupScreen(
             Text(
                 text = status,
                 color = if (status.startsWith("Error")) Color(0xFFFF5252) else Color(0xFF69F0AE),
-                modifier = Modifier.padding(8.dp)
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth()
+                    .background(Color(0x33FFFFFF))
+                    .padding(12.dp)
             )
         }
 
