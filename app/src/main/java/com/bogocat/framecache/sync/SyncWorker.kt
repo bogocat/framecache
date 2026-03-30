@@ -34,87 +34,90 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            // Sync local folder if enabled
             val localEnabled = settings.localFolderEnabled.first()
             val localUri = settings.localFolderUri.first()
-            if (localEnabled && localUri.isNotBlank()) {
-                syncLocalFolder(localUri)
-            }
-
             val albumIds = settings.albumIds.first()
-            Log.i(TAG, "Album IDs from settings: $albumIds")
+
             if (albumIds.isEmpty() && !localEnabled) {
-                Log.w(TAG, "No sources configured, skipping sync")
+                // No sources — prune everything
+                Log.w(TAG, "No sources configured, clearing cache")
+                assetDao.pruneRemoved(emptyList())
                 return Result.success()
             }
 
-            if (albumIds.isEmpty()) {
-                // Local-only mode, skip Immich sync
-                val count = assetDao.getCachedCount()
-                Log.i(TAG, "Local-only sync complete. $count images cached")
-                val now = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
-                    .format(java.util.Date())
-                settings.save(SettingsRepository.LAST_SYNC_TIME, now)
-                return Result.success()
+            // Track all valid asset IDs across all sources
+            val allKeepIds = mutableSetOf<String>()
+
+            // ── Sync local folder ──
+            if (localEnabled && localUri.isNotBlank()) {
+                val localIds = syncLocalFolder(localUri)
+                allKeepIds.addAll(localIds)
+            } else {
+                // Local disabled — prune any local assets
+                // (local IDs start with "local_")
             }
 
-            Log.i(TAG, "Starting Immich sync for ${albumIds.size} album(s)")
+            // ── Sync Immich albums ──
+            if (albumIds.isNotEmpty()) {
+                Log.i(TAG, "Starting Immich sync for ${albumIds.size} album(s)")
+                val allAssets = mutableListOf<AssetDto>()
+                for (albumId in albumIds) {
+                    try {
+                        val album = api.getAlbum(albumId)
+                        allAssets.addAll(album.assets.filter { it.type == "IMAGE" })
+                        Log.i(TAG, "Album '${album.albumName}': ${album.assets.size} assets")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to fetch album $albumId: ${e.message}")
+                    }
+                }
 
-            val allAssets = mutableListOf<AssetDto>()
-            for (albumId in albumIds) {
-                try {
-                    val album = api.getAlbum(albumId)
-                    allAssets.addAll(album.assets.filter { it.type == "IMAGE" })
-                    Log.i(TAG, "Album '${album.albumName}': ${album.assets.size} assets")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to fetch album $albumId: ${e.message}")
+                if (allAssets.isNotEmpty()) {
+                    val cached = allAssets.map { it.toCachedAsset(albumIds.first()) }
+                    assetDao.insertAll(cached)
+                    allKeepIds.addAll(allAssets.map { it.id })
+                }
+
+                // Re-link existing files on disk
+                val uncached = assetDao.getUncachedAssets(1000)
+                var relinked = 0
+                val toDownload = mutableListOf<CachedAsset>()
+                for (asset in uncached) {
+                    if (asset.id.startsWith("local_")) continue
+                    if (cacheManager.isAssetCached(asset.id)) {
+                        assetDao.updateFilePath(asset.id, cacheManager.getImageFile(asset.id).absolutePath)
+                        relinked++
+                    } else {
+                        toDownload.add(asset)
+                    }
+                }
+                if (relinked > 0) Log.i(TAG, "Re-linked $relinked existing files")
+
+                val batch = toDownload.take(DOWNLOAD_BATCH_SIZE)
+                Log.i(TAG, "Downloading ${batch.size} uncached images")
+                for (asset in batch) {
+                    cacheManager.downloadAndCache(asset.id)
                 }
             }
 
-            if (allAssets.isEmpty()) return Result.success()
-
-            // Upsert metadata
-            val cached = allAssets.map { it.toCachedAsset(albumIds.first()) }
-            assetDao.insertAll(cached)
-
-            // Prune assets removed from albums + delete orphaned files
-            val keepIds = allAssets.map { it.id }
-            val allCachedFiles = cacheManager.getAllCachedIds()
-            val orphanedFiles = allCachedFiles - keepIds.toSet()
-            for (orphanId in orphanedFiles) {
-                cacheManager.getImageFile(orphanId).delete()
-            }
-            if (orphanedFiles.isNotEmpty()) Log.i(TAG, "Deleted ${orphanedFiles.size} orphaned files")
-            assetDao.pruneRemoved(keepIds)
-
-            // Re-link existing files on disk (e.g., after DB migration)
-            val uncached = assetDao.getUncachedAssets(1000)
-            var relinked = 0
-            var toDownload = mutableListOf<CachedAsset>()
-            for (asset in uncached) {
-                if (cacheManager.isAssetCached(asset.id)) {
-                    assetDao.updateFilePath(asset.id, cacheManager.getImageFile(asset.id).absolutePath)
-                    relinked++
-                } else {
-                    toDownload.add(asset)
+            // ── Prune removed assets from ALL sources ──
+            if (allKeepIds.isNotEmpty()) {
+                // Delete orphaned Immich image files
+                val allCachedFiles = cacheManager.getAllCachedIds()
+                val immichKeepIds = allKeepIds.filter { !it.startsWith("local_") }.toSet()
+                val orphanedFiles = allCachedFiles - immichKeepIds
+                for (orphanId in orphanedFiles) {
+                    cacheManager.getImageFile(orphanId).delete()
                 }
-            }
-            if (relinked > 0) Log.i(TAG, "Re-linked $relinked existing files")
+                if (orphanedFiles.isNotEmpty()) Log.i(TAG, "Deleted ${orphanedFiles.size} orphaned files")
 
-            // Download truly uncached images
-            val batch = toDownload.take(DOWNLOAD_BATCH_SIZE)
-            Log.i(TAG, "Downloading ${batch.size} uncached images")
-            for (asset in batch) {
-                cacheManager.downloadAndCache(asset.id)
+                assetDao.pruneRemoved(allKeepIds.toList())
             }
 
-            // Evict old images if over limit
             cacheManager.evictIfNeeded()
 
             val count = assetDao.getCachedCount()
             Log.i(TAG, "Sync complete. $count images cached")
 
-            // Record last sync time
             val now = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
                 .format(java.util.Date())
             settings.save(SettingsRepository.LAST_SYNC_TIME, now)
@@ -172,7 +175,8 @@ class SyncWorker @AssistedInject constructor(
         )
     }
 
-    private suspend fun syncLocalFolder(uriString: String) {
+    private suspend fun syncLocalFolder(uriString: String): Set<String> {
+        val ids = mutableSetOf<String>()
         try {
             val uri = android.net.Uri.parse(uriString)
             val resolver = applicationContext.contentResolver
@@ -188,26 +192,29 @@ class SyncWorker @AssistedInject constructor(
                     android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED
                 ),
                 null, null, null
-            ) ?: return
+            ) ?: return ids
 
             val localAssets = mutableListOf<CachedAsset>()
             cursor.use {
                 while (it.moveToNext()) {
                     val docId = it.getString(0)
-                    val name = it.getString(1)
+                    val name = it.getString(1) ?: continue
                     val mime = it.getString(2) ?: ""
                     val lastModified = it.getLong(3)
 
                     if (!mime.startsWith("image/")) continue
+                    // Skip macOS resource fork files
+                    if (name.startsWith("._")) continue
 
                     val docUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, docId)
                     val id = "local_${docUri.hashCode()}"
+                    ids.add(id)
 
                     localAssets.add(CachedAsset(
                         id = id,
                         albumId = "local",
                         dateTaken = if (lastModified > 0) lastModified else null,
-                        description = name,
+                        description = name.substringBeforeLast("."),
                         filePath = docUri.toString(),
                         cachedAt = System.currentTimeMillis()
                     ))
@@ -221,6 +228,7 @@ class SyncWorker @AssistedInject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Local folder sync failed: ${e.message}")
         }
+        return ids
     }
 
     private fun parseDate(dateStr: String): Long? {
