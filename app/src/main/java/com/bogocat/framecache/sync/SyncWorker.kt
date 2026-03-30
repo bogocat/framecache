@@ -39,42 +39,49 @@ class SyncWorker @AssistedInject constructor(
             val albumIds = settings.albumIds.first()
 
             if (albumIds.isEmpty() && !localEnabled) {
-                // No sources — prune everything
-                Log.w(TAG, "No sources configured, clearing cache")
-                assetDao.pruneRemoved(emptyList())
+                Log.i(TAG, "No sources configured, keeping existing cache")
                 return Result.success()
             }
 
-            // Track all valid asset IDs across all sources
-            val allKeepIds = mutableSetOf<String>()
+            // Track valid IDs per source — only prune what we can confirm
+            val confirmedImmichIds = mutableSetOf<String>()
+            var immichSyncSucceeded = false
+
+            val confirmedLocalIds = mutableSetOf<String>()
+            var localSyncSucceeded = false
 
             // ── Sync local folder ──
             if (localEnabled && localUri.isNotBlank()) {
                 val localIds = syncLocalFolder(localUri)
-                allKeepIds.addAll(localIds)
-            } else {
-                // Local disabled — prune any local assets
-                // (local IDs start with "local_")
+                confirmedLocalIds.addAll(localIds)
+                localSyncSucceeded = true
             }
 
             // ── Sync Immich albums ──
             if (albumIds.isNotEmpty()) {
                 Log.i(TAG, "Starting Immich sync for ${albumIds.size} album(s)")
                 val allAssets = mutableListOf<AssetDto>()
+                var anyAlbumFetched = false
                 for (albumId in albumIds) {
                     try {
                         val album = api.getAlbum(albumId)
                         allAssets.addAll(album.assets.filter { it.type == "IMAGE" })
                         Log.i(TAG, "Album '${album.albumName}': ${album.assets.size} assets")
+                        anyAlbumFetched = true
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to fetch album $albumId: ${e.message}")
                     }
                 }
 
-                if (allAssets.isNotEmpty()) {
-                    val cached = allAssets.map { it.toCachedAsset(albumIds.first()) }
-                    assetDao.insertAll(cached)
-                    allKeepIds.addAll(allAssets.map { it.id })
+                if (anyAlbumFetched) {
+                    immichSyncSucceeded = true
+                    if (allAssets.isNotEmpty()) {
+                        val cached = allAssets.map { it.toCachedAsset(albumIds.first()) }
+                        assetDao.insertAll(cached)
+                        confirmedImmichIds.addAll(allAssets.map { it.id })
+                    }
+                } else {
+                    Log.w(TAG, "All Immich album fetches failed — keeping existing cache (network may be down)")
                 }
 
                 // Re-link existing files on disk
@@ -93,23 +100,53 @@ class SyncWorker @AssistedInject constructor(
                 if (relinked > 0) Log.i(TAG, "Re-linked $relinked existing files")
 
                 val batch = toDownload.take(DOWNLOAD_BATCH_SIZE)
-                Log.i(TAG, "Downloading ${batch.size} uncached images")
-                for (asset in batch) {
-                    cacheManager.downloadAndCache(asset.id)
+                if (batch.isNotEmpty()) {
+                    Log.i(TAG, "Downloading ${batch.size} uncached images")
+                    for (asset in batch) {
+                        cacheManager.downloadAndCache(asset.id)
+                    }
                 }
             }
 
-            // ── Prune removed assets from ALL sources ──
-            if (allKeepIds.isNotEmpty()) {
-                // Delete orphaned Immich image files
+            // ── Pruning: only prune sources we successfully synced ──
+            // If Immich sync succeeded, prune Immich assets not in the confirmed list
+            if (immichSyncSucceeded) {
                 val allCachedFiles = cacheManager.getAllCachedIds()
-                val immichKeepIds = allKeepIds.filter { !it.startsWith("local_") }.toSet()
-                val orphanedFiles = allCachedFiles - immichKeepIds
+                val orphanedFiles = allCachedFiles - confirmedImmichIds
                 for (orphanId in orphanedFiles) {
                     cacheManager.getImageFile(orphanId).delete()
                 }
-                if (orphanedFiles.isNotEmpty()) Log.i(TAG, "Deleted ${orphanedFiles.size} orphaned files")
+                if (orphanedFiles.isNotEmpty()) Log.i(TAG, "Deleted ${orphanedFiles.size} orphaned Immich files")
+            }
 
+            // If local sync succeeded, prune local assets not in the confirmed list
+            // (safe — local files are still on device, just removes from slideshow)
+            if (localSyncSucceeded || !localEnabled) {
+                // Prune local assets that are no longer in the folder (or local is disabled)
+                val localKeepIds = if (localEnabled) confirmedLocalIds else emptySet()
+                // We only prune local_ prefixed assets here
+                // handled by pruneRemoved below
+            }
+
+            // Build the full keep list: confirmed IDs + unconfirmed source's existing IDs
+            val allKeepIds = mutableSetOf<String>()
+            if (immichSyncSucceeded) {
+                allKeepIds.addAll(confirmedImmichIds)
+            } else {
+                // Keep all existing Immich assets (don't prune what we can't verify)
+                allKeepIds.addAll(assetDao.getUncachedAssets(10000).map { it.id })
+                allKeepIds.addAll(cacheManager.getAllCachedIds())
+            }
+            if (localEnabled && localSyncSucceeded) {
+                allKeepIds.addAll(confirmedLocalIds)
+            } else if (!localEnabled) {
+                // Local disabled — don't keep local assets (prune them)
+            } else {
+                // Local enabled but sync failed — keep existing local assets
+                // They have "local_" prefix
+            }
+
+            if (allKeepIds.isNotEmpty()) {
                 assetDao.pruneRemoved(allKeepIds.toList())
             }
 

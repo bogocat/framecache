@@ -162,8 +162,8 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Connection ──
-        SectionHeader("Connection")
+        // ── Photo Sources ──
+        SectionHeader("Photo Sources — Immich")
 
         // Status indicator
         Row(
@@ -331,7 +331,7 @@ fun SettingsScreen(
         SectionDivider()
 
         // ── Local Photos ──
-        SectionHeader("Local Photos")
+        SectionHeader("Photo Sources — Local Folder")
 
         SettingsToggle("Enable Local Folder", localFolderEnabled) {
             scope.launch { settings.save(SettingsRepository.LOCAL_FOLDER_ENABLED, it) }
