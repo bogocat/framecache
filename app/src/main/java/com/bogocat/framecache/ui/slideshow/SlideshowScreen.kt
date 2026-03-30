@@ -249,13 +249,19 @@ private fun PhotoDisplay(
     imageScale: String
 ) {
     val filePath = asset.filePath ?: return
+    // Support both file paths (Immich downloads) and content URIs (local folders)
+    val imageModel: Any = if (filePath.startsWith("content://")) {
+        android.net.Uri.parse(filePath)
+    } else {
+        File(filePath)
+    }
     val contentScale = if (imageScale == "fill") ContentScale.Crop else ContentScale.Fit
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Blurred background
         if (backgroundBlur) {
             AsyncImage(
-                model = File(filePath),
+                model = imageModel,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -267,14 +273,14 @@ private fun PhotoDisplay(
         // Main image
         if (kenBurnsEnabled) {
             KenBurnsImage(
-                model = File(filePath),
+                model = imageModel,
                 durationMs = durationMs,
                 zoomAmount = kenBurnsZoom / 100f,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
             AsyncImage(
-                model = File(filePath),
+                model = imageModel,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize()

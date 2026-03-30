@@ -65,8 +65,9 @@ class SettingsRepository @Inject constructor(
         val SLEEP_END_HOUR = intPreferencesKey("sleep_end_hour")
         val SLEEP_DIM = booleanPreferencesKey("sleep_dim")
 
-        // Display
-        val ORIENTATION_LOCK = stringPreferencesKey("orientation_lock")
+        // Local photos
+        val LOCAL_FOLDER_URI = stringPreferencesKey("local_folder_uri")
+        val LOCAL_FOLDER_ENABLED = booleanPreferencesKey("local_folder_enabled")
     }
 
     // Connection
@@ -112,11 +113,14 @@ class SettingsRepository @Inject constructor(
     val sleepEndHour: Flow<Int> = context.dataStore.data.map { it[SLEEP_END_HOUR] ?: 7 }
     val sleepDim: Flow<Boolean> = context.dataStore.data.map { it[SLEEP_DIM] ?: true }
 
-    // Display
-    val orientationLock: Flow<String> = context.dataStore.data.map { it[ORIENTATION_LOCK] ?: "auto" }
+    // Local photos
+    val localFolderUri: Flow<String> = context.dataStore.data.map { it[LOCAL_FOLDER_URI] ?: "" }
+    val localFolderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LOCAL_FOLDER_ENABLED] ?: false }
 
     val isConfigured: Flow<Boolean> = context.dataStore.data.map {
-        !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()
+        val hasImmich = !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()
+        val hasLocal = it[LOCAL_FOLDER_ENABLED] == true && !it[LOCAL_FOLDER_URI].isNullOrBlank()
+        hasImmich || hasLocal
     }
 
     suspend fun saveServerConfig(url: String, apiKey: String, albumIds: List<String>) {

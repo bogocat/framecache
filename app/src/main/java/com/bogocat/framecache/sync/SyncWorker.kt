@@ -34,14 +34,31 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
+            // Sync local folder if enabled
+            val localEnabled = settings.localFolderEnabled.first()
+            val localUri = settings.localFolderUri.first()
+            if (localEnabled && localUri.isNotBlank()) {
+                syncLocalFolder(localUri)
+            }
+
             val albumIds = settings.albumIds.first()
             Log.i(TAG, "Album IDs from settings: $albumIds")
-            if (albumIds.isEmpty()) {
-                Log.w(TAG, "No album IDs configured, skipping sync")
+            if (albumIds.isEmpty() && !localEnabled) {
+                Log.w(TAG, "No sources configured, skipping sync")
                 return Result.success()
             }
 
-            Log.i(TAG, "Starting sync for ${albumIds.size} album(s)")
+            if (albumIds.isEmpty()) {
+                // Local-only mode, skip Immich sync
+                val count = assetDao.getCachedCount()
+                Log.i(TAG, "Local-only sync complete. $count images cached")
+                val now = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
+                    .format(java.util.Date())
+                settings.save(SettingsRepository.LAST_SYNC_TIME, now)
+                return Result.success()
+            }
+
+            Log.i(TAG, "Starting Immich sync for ${albumIds.size} album(s)")
 
             val allAssets = mutableListOf<AssetDto>()
             for (albumId in albumIds) {
@@ -153,6 +170,57 @@ class SyncWorker @AssistedInject constructor(
             width = width,
             height = height
         )
+    }
+
+    private suspend fun syncLocalFolder(uriString: String) {
+        try {
+            val uri = android.net.Uri.parse(uriString)
+            val resolver = applicationContext.contentResolver
+            val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+                uri, android.provider.DocumentsContract.getTreeDocumentId(uri)
+            )
+            val cursor = resolver.query(
+                childrenUri,
+                arrayOf(
+                    android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                ),
+                null, null, null
+            ) ?: return
+
+            val localAssets = mutableListOf<CachedAsset>()
+            cursor.use {
+                while (it.moveToNext()) {
+                    val docId = it.getString(0)
+                    val name = it.getString(1)
+                    val mime = it.getString(2) ?: ""
+                    val lastModified = it.getLong(3)
+
+                    if (!mime.startsWith("image/")) continue
+
+                    val docUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(uri, docId)
+                    val id = "local_${docUri.hashCode()}"
+
+                    localAssets.add(CachedAsset(
+                        id = id,
+                        albumId = "local",
+                        dateTaken = if (lastModified > 0) lastModified else null,
+                        description = name,
+                        filePath = docUri.toString(),
+                        cachedAt = System.currentTimeMillis()
+                    ))
+                }
+            }
+
+            if (localAssets.isNotEmpty()) {
+                assetDao.insertAll(localAssets)
+                Log.i(TAG, "Local folder: ${localAssets.size} images found")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Local folder sync failed: ${e.message}")
+        }
     }
 
     private fun parseDate(dateStr: String): Long? {

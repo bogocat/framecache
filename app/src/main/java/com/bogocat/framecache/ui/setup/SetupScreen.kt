@@ -19,6 +19,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -192,13 +193,6 @@ fun SetupScreen(
             Text(buttonLabel)
         }
 
-        if (false) { // remove standalone spinner since it's in the button now
-            CircularProgressIndicator(
-                color = accentColor,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-
         if (status.isNotBlank()) {
             Text(
                 text = status,
@@ -269,8 +263,39 @@ fun SetupScreen(
                 Text("Start")
             }
         }
+
+        // Local photos option
+        Spacer(modifier = Modifier.height(24.dp))
+        Divider(color = Color(0x33FFFFFF))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Or use local photos", color = Color(0xAAFFFFFF), fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val localFolderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+        ) { uri ->
+            if (uri != null) {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                scope.launch {
+                    settings.save(com.bogocat.framecache.data.settings.SettingsRepository.LOCAL_FOLDER_ENABLED, true)
+                    settings.save(com.bogocat.framecache.data.settings.SettingsRepository.LOCAL_FOLDER_URI, uri.toString())
+                    onSetupComplete()
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = { localFolderLauncher.launch(null) },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor)
+        ) {
+            Text("Choose Photo Folder", color = accentColor)
+        }
     }
 }
+
 
 private fun createTestApi(serverUrl: String, apiKey: String): ImmichApi {
     val url = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"

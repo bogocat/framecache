@@ -106,7 +106,8 @@ fun SettingsScreen(
     val sleepStartHour by settings.sleepStartHour.collectAsState(initial = 22)
     val sleepEndHour by settings.sleepEndHour.collectAsState(initial = 7)
     val sleepDim by settings.sleepDim.collectAsState(initial = true)
-    // orientationLock removed — Frameo devices have fixed orientations
+    val localFolderEnabled by settings.localFolderEnabled.collectAsState(initial = false)
+    val localFolderUri by settings.localFolderUri.collectAsState(initial = "")
 
     // Connection editing state
     var isEditing by remember { mutableStateOf(false) }
@@ -325,6 +326,44 @@ fun SettingsScreen(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
                 ) { Text("Cancel", color = subtextColor) }
             }
+        }
+
+        SectionDivider()
+
+        // ── Local Photos ──
+        SectionHeader("Local Photos")
+
+        SettingsToggle("Enable Local Folder", localFolderEnabled) {
+            scope.launch { settings.save(SettingsRepository.LOCAL_FOLDER_ENABLED, it) }
+        }
+
+        if (localFolderEnabled) {
+            if (localFolderUri.isNotBlank()) {
+                val folderName = try {
+                    android.net.Uri.parse(localFolderUri).lastPathSegment ?: localFolderUri
+                } catch (_: Exception) { localFolderUri }
+                InfoRow("Folder", folderName)
+            }
+
+            val folderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+            ) { uri ->
+                if (uri != null) {
+                    // Persist permission across reboots
+                    context.contentResolver.takePersistableUriPermission(
+                        uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                    scope.launch {
+                        settings.save(SettingsRepository.LOCAL_FOLDER_URI, uri.toString())
+                        SyncScheduler.triggerImmediateSync(context)
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = { folderLauncher.launch(null) },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = sectionColor)
+            ) { Text(if (localFolderUri.isBlank()) "Choose Folder" else "Change Folder", color = sectionColor) }
         }
 
         SectionDivider()
