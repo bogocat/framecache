@@ -250,8 +250,14 @@ fun SettingsScreen(
                 albumsLoading = true
                 try {
                     fetchedAlbums = api.getAlbums()
+                    val validIds = fetchedAlbums.map { it.id }.toSet()
                     selectedAlbumIds.clear()
-                    selectedAlbumIds.addAll(albumIdsRaw)
+                    selectedAlbumIds.addAll(albumIdsRaw.filter { it in validIds })
+                    // Clean up stale IDs in DataStore
+                    val cleaned = albumIdsRaw.filter { it in validIds }
+                    if (cleaned.size != albumIdsRaw.size) {
+                        settings.saveServerConfig(serverUrl, apiKey, cleaned)
+                    }
                 } catch (_: Exception) {}
                 albumsLoading = false
             }
@@ -267,8 +273,9 @@ fun SettingsScreen(
                             albumsLoading = true
                             try {
                                 fetchedAlbums = api.getAlbums()
+                                val validIds = fetchedAlbums.map { it.id }.toSet()
                                 selectedAlbumIds.clear()
-                                selectedAlbumIds.addAll(albumIdsRaw)
+                                selectedAlbumIds.addAll(albumIdsRaw.filter { it in validIds })
                             } catch (_: Exception) {}
                             albumsLoading = false
                         }
@@ -301,9 +308,9 @@ fun SettingsScreen(
                             onCheckedChange = { checked ->
                                 if (checked) selectedAlbumIds.add(album.id)
                                 else selectedAlbumIds.remove(album.id)
+                                // Save immediately but don't sync — sync fires when leaving settings
                                 scope.launch {
                                     settings.saveServerConfig(serverUrl, apiKey, selectedAlbumIds.toList())
-                                    SyncScheduler.triggerImmediateSync(context)
                                 }
                             },
                             colors = androidx.compose.material3.CheckboxDefaults.colors(
@@ -321,8 +328,9 @@ fun SettingsScreen(
                             albumsLoading = true
                             try {
                                 fetchedAlbums = api.getAlbums()
+                                val validIds = fetchedAlbums.map { it.id }.toSet()
                                 selectedAlbumIds.clear()
-                                selectedAlbumIds.addAll(albumIdsRaw)
+                                selectedAlbumIds.addAll(albumIdsRaw.filter { it in validIds })
                             } catch (_: Exception) {}
                             albumsLoading = false
                         }
