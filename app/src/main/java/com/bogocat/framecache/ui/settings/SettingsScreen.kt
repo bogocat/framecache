@@ -279,7 +279,8 @@ fun SettingsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Immich Albums (${albumIdsRaw.size} selected)", color = textColor, fontSize = 16.sp)
+            val albumCount = if (fetchedAlbums.isNotEmpty()) selectedAlbumIds.size else albumIdsRaw.size
+            Text("Immich Albums ($albumCount selected)", color = textColor, fontSize = 16.sp)
             Text(if (albumsExpanded) "\u25B2" else "\u25BC", color = subtextColor, fontSize = 12.sp)
         }
 
