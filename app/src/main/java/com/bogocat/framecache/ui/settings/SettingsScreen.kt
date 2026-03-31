@@ -163,8 +163,8 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Photo Sources ──
-        SectionHeader("Photo Sources — Immich")
+        // ── Server Connection ──
+        SectionHeader("Server Connection")
 
         // Status indicator
         Row(
@@ -184,7 +184,64 @@ fun SettingsScreen(
             }
         }
 
-        // ── Albums (foldable, auto-loads) ──
+        if (!isEditing) {
+            InfoRow("Server", serverUrl.ifBlank { "Not configured" })
+            InfoRow("API Key", if (apiKey.isNotBlank()) "\u2022\u2022\u2022${apiKey.takeLast(8)}" else "Not set")
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { isEditing = true },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
+            ) { Text("Edit Server", color = subtextColor) }
+        } else {
+            OutlinedTextField(
+                value = editUrl, onValueChange = { editUrl = it },
+                label = { Text("Server URL") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = editApiKey, onValueChange = { editApiKey = it },
+                label = { Text("API Key") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            settings.saveServerConfig(editUrl, editApiKey, selectedAlbumIds.toList())
+                            isEditing = false
+                            fetchedAlbums = emptyList()
+                            connTesting = true
+                            try {
+                                val about = api.getServerAbout()
+                                val albums = api.getAlbums()
+                                connStatus = "Immich ${about.version}"
+                                connAlbumCount = albums.size
+                                connPhotoCount = albums.sumOf { it.assetCount }
+                                connOk = true
+                            } catch (e: Exception) {
+                                connStatus = "Error: ${e.message?.take(50)}"
+                                connOk = false
+                            }
+                            connTesting = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = sectionColor, contentColor = Color.Black)
+                ) { Text("Save") }
+                OutlinedButton(
+                    onClick = { editUrl = serverUrl; editApiKey = apiKey; isEditing = false },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
+                ) { Text("Cancel", color = subtextColor) }
+            }
+        }
+
+        SectionDivider()
+
+        // ── Photo Sources ──
+        SectionHeader("Photo Sources")
+
+        // Albums (foldable)
         var albumsExpanded by remember { mutableStateOf(false) }
 
         // Auto-fetch albums when connection is OK
@@ -203,21 +260,27 @@ fun SettingsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { albumsExpanded = !albumsExpanded }
+                .clickable {
+                    if (fetchedAlbums.isEmpty() && !albumsLoading && !albumsExpanded) {
+                        // Try to load albums on expand
+                        scope.launch {
+                            albumsLoading = true
+                            try {
+                                fetchedAlbums = api.getAlbums()
+                                selectedAlbumIds.clear()
+                                selectedAlbumIds.addAll(albumIdsRaw)
+                            } catch (_: Exception) {}
+                            albumsLoading = false
+                        }
+                    }
+                    albumsExpanded = !albumsExpanded
+                }
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Albums (${albumIdsRaw.size} selected)",
-                color = textColor,
-                fontSize = 16.sp
-            )
-            Text(
-                if (albumsExpanded) "\u25B2" else "\u25BC",
-                color = subtextColor,
-                fontSize = 12.sp
-            )
+            Text("Immich Albums (${albumIdsRaw.size} selected)", color = textColor, fontSize = 16.sp)
+            Text(if (albumsExpanded) "\u25B2" else "\u25BC", color = subtextColor, fontSize = 12.sp)
         }
 
         if (albumsExpanded) {
@@ -243,93 +306,35 @@ fun SettingsScreen(
                                 }
                             },
                             colors = androidx.compose.material3.CheckboxDefaults.colors(
-                                checkedColor = sectionColor,
-                                uncheckedColor = subtextColor,
-                                checkmarkColor = Color.Black
+                                checkedColor = sectionColor, uncheckedColor = subtextColor, checkmarkColor = Color.Black
                             )
                         )
                         Text("${album.albumName} (${album.assetCount})", color = textColor, fontSize = 14.sp)
                     }
                 }
             } else {
-                Text("Connect to server to load albums", color = subtextColor, fontSize = 13.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // ── Server config (protected) ──
-        if (!isEditing) {
-            InfoRow("Server", serverUrl.ifBlank { "Not configured" })
-            InfoRow("API Key", if (apiKey.isNotBlank()) "\u2022\u2022\u2022${apiKey.takeLast(8)}" else "Not set")
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = { isEditing = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
-            ) { Text("Edit Server", color = subtextColor) }
-        } else {
-            OutlinedTextField(
-                value = editUrl,
-                onValueChange = { editUrl = it },
-                label = { Text("Server URL") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = fieldColors
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = editApiKey,
-                onValueChange = { editApiKey = it },
-                label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = fieldColors
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            settings.saveServerConfig(editUrl, editApiKey, selectedAlbumIds.toList())
-                            isEditing = false
-                            fetchedAlbums = emptyList()
-                            connTesting = true
-                            try {
-                                val about = api.getServerAbout()
-                                val albums = api.getAlbums()
-                                connStatus = "Immich ${about.version}"
-                                connAlbumCount = albums.size
-                                connPhotoCount = albums.sumOf { it.assetCount }
-                                connOk = true
-                            } catch (e: Exception) {
-                                connStatus = "Error: ${e.message?.take(50)}"
-                                connOk = false
-                            }
-                            connTesting = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = sectionColor, contentColor = Color.Black)
-                ) { Text("Save") }
-
+                Text("Could not load albums — check server connection", color = subtextColor, fontSize = 13.sp)
                 OutlinedButton(
                     onClick = {
-                        editUrl = serverUrl
-                        editApiKey = apiKey
-                        isEditing = false
+                        scope.launch {
+                            albumsLoading = true
+                            try {
+                                fetchedAlbums = api.getAlbums()
+                                selectedAlbumIds.clear()
+                                selectedAlbumIds.addAll(albumIdsRaw)
+                            } catch (_: Exception) {}
+                            albumsLoading = false
+                        }
                     },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
-                ) { Text("Cancel", color = subtextColor) }
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = sectionColor)
+                ) { Text("Retry", color = sectionColor) }
             }
         }
 
-        SectionDivider()
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // ── Local Photos ──
-        SectionHeader("Photo Sources — Local Folder")
+        // Local Folder
+        Text("Local Folder", color = textColor, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
 
         SettingsToggle("Enable Local Folder", localFolderEnabled) {
             scope.launch { settings.save(SettingsRepository.LOCAL_FOLDER_ENABLED, it) }
