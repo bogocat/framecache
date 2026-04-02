@@ -43,8 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bogocat.framecache.api.ImmichApi
+import com.bogocat.framecache.api.navidrome.NavidromeClient
 import com.bogocat.framecache.data.cache.ImageCacheManager
 import com.bogocat.framecache.data.settings.SettingsRepository
+import com.bogocat.framecache.music.MusicPlayer
 import com.bogocat.framecache.sync.SyncScheduler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -75,6 +77,8 @@ fun SettingsScreen(
     settings: SettingsRepository,
     cacheManager: ImageCacheManager,
     api: ImmichApi,
+    navidromeClient: NavidromeClient? = null,
+    musicPlayer: MusicPlayer? = null,
     onBack: () -> Unit
 ) {
     val serverUrl by settings.serverUrl.collectAsState(initial = "")
@@ -109,6 +113,12 @@ fun SettingsScreen(
     val sleepDim by settings.sleepDim.collectAsState(initial = true)
     val localFolderEnabled by settings.localFolderEnabled.collectAsState(initial = false)
     val localFolderUri by settings.localFolderUri.collectAsState(initial = "")
+
+    // Navidrome
+    val navidromeEnabled by settings.navidromeEnabled.collectAsState(initial = false)
+    val navidromeUrl by settings.navidromeUrl.collectAsState(initial = "")
+    val navidromeUsername by settings.navidromeUsername.collectAsState(initial = "")
+    val navidromePassword by settings.navidromePassword.collectAsState(initial = "")
 
     // Connection editing state
     var isEditing by remember { mutableStateOf(false) }
@@ -549,6 +559,133 @@ fun SettingsScreen(
             }
             SettingsToggle("Dim (vs black)", sleepDim) {
                 scope.launch { settings.save(SettingsRepository.SLEEP_DIM, it) }
+            }
+        }
+
+        SectionDivider()
+
+        // ── Music (Navidrome) ──
+        SectionHeader("Music (Navidrome)")
+
+        SettingsToggle("Enable Music", navidromeEnabled) {
+            scope.launch { settings.save(SettingsRepository.NAVIDROME_ENABLED, it) }
+        }
+
+        if (navidromeEnabled) {
+            var editingMusic by remember { mutableStateOf(navidromeUrl.isBlank()) }
+            var editNavUrl by remember(navidromeUrl) { mutableStateOf(navidromeUrl) }
+            var editNavUser by remember(navidromeUsername) { mutableStateOf(navidromeUsername) }
+            var editNavPass by remember(navidromePassword) { mutableStateOf(navidromePassword) }
+            var navTesting by remember { mutableStateOf(false) }
+            var navStatus by remember { mutableStateOf("") }
+            var navOk by remember { mutableStateOf(false) }
+
+            // Auto-test on open if configured
+            LaunchedEffect(navidromeUrl) {
+                if (navidromeUrl.isNotBlank() && navidromeClient != null) {
+                    navTesting = true
+                    navOk = navidromeClient.ping()
+                    navStatus = if (navOk) "Connected" else "Connection failed"
+                    navTesting = false
+                }
+            }
+
+            // Status
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (navTesting) {
+                    CircularProgressIndicator(color = sectionColor, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text("Testing...", color = subtextColor, fontSize = 13.sp)
+                } else if (navOk) {
+                    Text("\u2713", color = successColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(navStatus, color = successColor, fontSize = 13.sp)
+                } else if (navStatus.isNotBlank()) {
+                    Text("\u2717", color = errorColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(navStatus, color = errorColor, fontSize = 13.sp)
+                }
+            }
+
+            if (!editingMusic && navidromeUrl.isNotBlank()) {
+                InfoRow("Server", navidromeUrl)
+                InfoRow("User", navidromeUsername)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { editingMusic = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
+                ) { Text("Edit Connection", color = subtextColor) }
+            } else {
+                OutlinedTextField(
+                    value = editNavUrl, onValueChange = { editNavUrl = it },
+                    label = { Text("Navidrome URL") },
+                    placeholder = { Text("https://music.bogocat.com", color = Color(0x44FFFFFF)) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = editNavUser, onValueChange = { editNavUser = it },
+                    label = { Text("Username") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = editNavPass, onValueChange = { editNavPass = it },
+                    label = { Text("Password") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, colors = fieldColors
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                settings.saveNavidromeConfig(editNavUrl, editNavUser, editNavPass)
+                                editingMusic = false
+                                // Test after save
+                                navTesting = true
+                                navOk = navidromeClient?.ping() == true
+                                navStatus = if (navOk) "Connected" else "Connection failed"
+                                navTesting = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = sectionColor, contentColor = Color.Black)
+                    ) { Text("Save") }
+                    if (navidromeUrl.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                editNavUrl = navidromeUrl
+                                editNavUser = navidromeUsername
+                                editNavPass = navidromePassword
+                                editingMusic = false
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = subtextColor)
+                        ) { Text("Cancel", color = subtextColor) }
+                    }
+                }
+            }
+
+            // Quick play test
+            if (navOk && musicPlayer != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                var testPlaying by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            if (testPlaying) {
+                                musicPlayer.togglePlayPause()
+                                testPlaying = false
+                            } else {
+                                val songs = navidromeClient?.getRandomSongs(1) ?: emptyList()
+                                if (songs.isNotEmpty()) {
+                                    musicPlayer.playQueue(songs)
+                                    testPlaying = true
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = sectionColor)
+                ) { Text(if (testPlaying) "Stop Test" else "Test Playback", color = sectionColor) }
             }
         }
 

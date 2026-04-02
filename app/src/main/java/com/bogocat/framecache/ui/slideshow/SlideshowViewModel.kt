@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bogocat.framecache.data.db.AssetDao
 import com.bogocat.framecache.data.db.CachedAsset
 import com.bogocat.framecache.data.settings.SettingsRepository
+import com.bogocat.framecache.music.MusicPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,7 +28,8 @@ data class SlideshowState(
 @HiltViewModel
 class SlideshowViewModel @Inject constructor(
     private val assetDao: AssetDao,
-    private val settings: SettingsRepository
+    private val settings: SettingsRepository,
+    val musicPlayer: MusicPlayer
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SlideshowState())

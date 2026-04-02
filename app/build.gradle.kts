@@ -82,6 +82,11 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
+    // Media3 (ExoPlayer)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
+    implementation(libs.media3.datasource.okhttp)
+
     // Core
     implementation(libs.activity.compose)
     implementation(libs.core.ktx)

@@ -68,6 +68,12 @@ class SettingsRepository @Inject constructor(
         // Local photos
         val LOCAL_FOLDER_URI = stringPreferencesKey("local_folder_uri")
         val LOCAL_FOLDER_ENABLED = booleanPreferencesKey("local_folder_enabled")
+
+        // Navidrome
+        val NAVIDROME_URL = stringPreferencesKey("navidrome_url")
+        val NAVIDROME_USERNAME = stringPreferencesKey("navidrome_username")
+        val NAVIDROME_PASSWORD = stringPreferencesKey("navidrome_password")
+        val NAVIDROME_ENABLED = booleanPreferencesKey("navidrome_enabled")
     }
 
     // Connection
@@ -117,6 +123,12 @@ class SettingsRepository @Inject constructor(
     val localFolderUri: Flow<String> = context.dataStore.data.map { it[LOCAL_FOLDER_URI] ?: "" }
     val localFolderEnabled: Flow<Boolean> = context.dataStore.data.map { it[LOCAL_FOLDER_ENABLED] ?: false }
 
+    // Navidrome
+    val navidromeUrl: Flow<String> = context.dataStore.data.map { it[NAVIDROME_URL] ?: "" }
+    val navidromeUsername: Flow<String> = context.dataStore.data.map { it[NAVIDROME_USERNAME] ?: "" }
+    val navidromePassword: Flow<String> = context.dataStore.data.map { it[NAVIDROME_PASSWORD] ?: "" }
+    val navidromeEnabled: Flow<Boolean> = context.dataStore.data.map { it[NAVIDROME_ENABLED] ?: false }
+
     val isConfigured: Flow<Boolean> = context.dataStore.data.map {
         val hasImmich = !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()
         val hasLocal = it[LOCAL_FOLDER_ENABLED] == true && !it[LOCAL_FOLDER_URI].isNullOrBlank()
@@ -128,6 +140,15 @@ class SettingsRepository @Inject constructor(
             it[SERVER_URL] = url.trimEnd('/')
             it[API_KEY] = apiKey
             it[ALBUM_IDS] = albumIds.joinToString(",")
+        }
+    }
+
+    suspend fun saveNavidromeConfig(url: String, username: String, password: String) {
+        context.dataStore.edit {
+            it[NAVIDROME_URL] = url.trimEnd('/')
+            it[NAVIDROME_USERNAME] = username
+            it[NAVIDROME_PASSWORD] = password
+            it[NAVIDROME_ENABLED] = true
         }
     }
 

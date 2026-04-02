@@ -93,23 +93,12 @@ fun MetadataOverlay(
             }
         }
 
-        // Top-right: people (with optional age)
-        if (showPeople && asset?.peopleName != null) {
-            val peopleText = if (showPersonAge && asset.peopleBirthDates != null && asset.dateTaken != null) {
-                formatPeopleWithAge(asset.peopleName, asset.peopleBirthDates, asset.dateTaken)
-            } else {
-                asset.peopleName
-            }
-            Pill(modifier = Modifier.align(Alignment.TopEnd).padding(20.dp)) {
-                Text(text = peopleText, color = Color.White, fontSize = 14.sp)
-            }
-        }
-
-        // Bottom-left: photo info (date, location, camera, rating)
+        // Bottom-left: photo info (date, location, camera, rating, people)
         val hasPhotoInfo = (showPhotoDate && asset?.dateTaken != null) ||
             (showLocation && asset?.location != null) ||
             (showCamera && asset?.cameraModel != null) ||
-            (showRating && asset?.rating != null && asset.rating > 0)
+            (showRating && asset?.rating != null && asset.rating > 0) ||
+            (showPeople && asset?.peopleName != null)
 
         if (hasPhotoInfo) {
             Pill(modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)) {
@@ -139,6 +128,18 @@ fun MetadataOverlay(
                         Text(
                             text = "\u2605".repeat(asset.rating) + "\u2606".repeat(5 - asset.rating),
                             color = Color(0xFFFFD700),
+                            fontSize = 13.sp
+                        )
+                    }
+                    if (showPeople && asset?.peopleName != null) {
+                        val peopleText = if (showPersonAge && asset.peopleBirthDates != null && asset.dateTaken != null) {
+                            formatPeopleWithAge(asset.peopleName, asset.peopleBirthDates, asset.dateTaken)
+                        } else {
+                            asset.peopleName
+                        }
+                        Text(
+                            text = peopleText,
+                            color = Color(0xCCFFFFFF),
                             fontSize = 13.sp
                         )
                     }

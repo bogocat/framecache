@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import coil3.compose.AsyncImage
 import com.bogocat.framecache.data.db.CachedAsset
+import com.bogocat.framecache.music.NowPlaying
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.random.Random
@@ -48,6 +49,7 @@ fun SlideshowScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
+    val nowPlaying by viewModel.musicPlayer.nowPlaying.collectAsState()
     val showClock by viewModel.showClock.collectAsState()
     val showDate by viewModel.showDate.collectAsState()
     val showPhotoDate by viewModel.showPhotoDate.collectAsState()
@@ -194,6 +196,7 @@ fun SlideshowScreen(
                     Text("PAUSED", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
+
         }
 
         // Sleep overlay
@@ -235,6 +238,16 @@ fun SlideshowScreen(
                         onLongPress = { onOpenSettings() }
                     )
                 }
+        )
+
+        // Now playing pill — ABOVE touch zone so controls receive taps
+        NowPlayingPill(
+            nowPlaying = nowPlaying,
+            musicPlayer = viewModel.musicPlayer,
+            onClick = { /* TODO: open music mode screen */ },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(20.dp)
         )
     }
 }

@@ -12,8 +12,10 @@ import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.bogocat.framecache.api.navidrome.NavidromeClient
 import com.bogocat.framecache.data.cache.ImageCacheManager
 import com.bogocat.framecache.data.settings.SettingsRepository
+import com.bogocat.framecache.music.MusicPlayer
 import com.bogocat.framecache.sync.SyncScheduler
 import com.bogocat.framecache.ui.settings.SettingsScreen
 import com.bogocat.framecache.ui.setup.SetupScreen
@@ -29,6 +31,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var cacheManager: ImageCacheManager
     @Inject lateinit var api: com.bogocat.framecache.api.ImmichApi
+    @Inject lateinit var navidromeClient: NavidromeClient
+    @Inject lateinit var musicPlayer: MusicPlayer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +76,8 @@ class MainActivity : ComponentActivity() {
                             settings = settings,
                             cacheManager = cacheManager,
                             api = api,
+                            navidromeClient = navidromeClient,
+                            musicPlayer = musicPlayer,
                             onBack = {
                                 setShowSettings(false)
                                 SyncScheduler.triggerImmediateSync(this@MainActivity)
@@ -86,6 +92,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        musicPlayer.release()
     }
 
     private fun handleConfigIntent(intent: android.content.Intent) {
