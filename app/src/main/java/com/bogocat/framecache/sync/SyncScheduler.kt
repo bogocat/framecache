@@ -14,6 +14,8 @@ object SyncScheduler {
 
     private const val PERIODIC_WORK_NAME = "immich_periodic_sync"
     private const val INITIAL_WORK_NAME = "immich_initial_sync"
+    private const val MUSIC_PERIODIC_WORK_NAME = "music_periodic_sync"
+    private const val MUSIC_IMMEDIATE_WORK_NAME = "music_immediate_sync"
 
     private val wifiConstraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.UNMETERED)
@@ -25,29 +27,39 @@ object SyncScheduler {
         .build()
 
     fun schedulePeriodicSync(context: Context) {
-        val work = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
+        val imageWork = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
             .setConstraints(wifiConstraints)
             .build()
 
-        WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(
-                PERIODIC_WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                work
-            )
+        val musicWork = PeriodicWorkRequestBuilder<MusicSyncWorker>(1, TimeUnit.HOURS)
+            .setConstraints(wifiConstraints)
+            .build()
+
+        val wm = WorkManager.getInstance(context)
+        wm.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, imageWork)
+        wm.enqueueUniquePeriodicWork(MUSIC_PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, musicWork)
     }
 
     fun triggerImmediateSync(context: Context) {
-        val work = OneTimeWorkRequestBuilder<SyncWorker>()
+        val imageWork = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(anyNetworkConstraints)
             .build()
 
+        val musicWork = OneTimeWorkRequestBuilder<MusicSyncWorker>()
+            .setConstraints(anyNetworkConstraints)
+            .build()
+
+        val wm = WorkManager.getInstance(context)
+        wm.enqueueUniqueWork(INITIAL_WORK_NAME, ExistingWorkPolicy.REPLACE, imageWork)
+        wm.enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.REPLACE, musicWork)
+    }
+
+    fun triggerMusicSync(context: Context) {
+        val work = OneTimeWorkRequestBuilder<MusicSyncWorker>()
+            .setConstraints(anyNetworkConstraints)
+            .build()
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(
-                INITIAL_WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
-                work
-            )
+            .enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.REPLACE, work)
     }
 
     fun cancelAll(context: Context) {

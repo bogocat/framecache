@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -46,10 +47,12 @@ import kotlin.random.Random
 @Composable
 fun SlideshowScreen(
     viewModel: SlideshowViewModel = hiltViewModel(),
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onOpenMusic: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val nowPlaying by viewModel.musicPlayer.nowPlaying.collectAsState()
+    val navidromeEnabled by viewModel.navidromeEnabled.collectAsState()
     val showClock by viewModel.showClock.collectAsState()
     val showDate by viewModel.showDate.collectAsState()
     val showPhotoDate by viewModel.showPhotoDate.collectAsState()
@@ -241,14 +244,36 @@ fun SlideshowScreen(
         )
 
         // Now playing pill — ABOVE touch zone so controls receive taps
-        NowPlayingPill(
-            nowPlaying = nowPlaying,
-            musicPlayer = viewModel.musicPlayer,
-            onClick = { /* TODO: open music mode screen */ },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(20.dp)
-        )
+        val musicActive = nowPlaying.song.id.isNotEmpty() &&
+                (nowPlaying.isPlaying || viewModel.musicPlayer.isActive())
+
+        if (musicActive) {
+            NowPlayingPill(
+                nowPlaying = nowPlaying,
+                musicPlayer = viewModel.musicPlayer,
+                onClick = onOpenMusic,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(20.dp)
+            )
+        } else if (navidromeEnabled) {
+            // Music launcher button when not playing
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(20.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x88000000))
+                    .clickable(onClick = onOpenMusic)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = "Music",
+                    color = Color(0xAAFFFFFF),
+                    fontSize = 13.sp
+                )
+            }
+        }
     }
 }
 

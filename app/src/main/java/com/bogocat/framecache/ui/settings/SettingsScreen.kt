@@ -171,7 +171,43 @@ fun SettingsScreen(
     ) {
         Text("FrameCache Settings", color = textColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ── Brightness ──
+        val window = (context as? android.app.Activity)?.window
+        var brightness by remember {
+            mutableStateOf(
+                window?.attributes?.screenBrightness?.let {
+                    if (it < 0) 0.5f else it  // -1 means system default
+                } ?: 0.5f
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Brightness", color = textColor, fontSize = 15.sp)
+            Slider(
+                value = brightness,
+                onValueChange = {
+                    brightness = it
+                    window?.let { w ->
+                        val params = w.attributes
+                        params.screenBrightness = it.coerceIn(0.01f, 1f)
+                        w.attributes = params
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = sectionColor,
+                    activeTrackColor = sectionColor,
+                    inactiveTrackColor = Color(0x33FFFFFF)
+                )
+            )
+        }
+
+        SectionDivider()
 
         // ── Server Connection ──
         SectionHeader("Server Connection")

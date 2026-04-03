@@ -74,6 +74,8 @@ class SettingsRepository @Inject constructor(
         val NAVIDROME_USERNAME = stringPreferencesKey("navidrome_username")
         val NAVIDROME_PASSWORD = stringPreferencesKey("navidrome_password")
         val NAVIDROME_ENABLED = booleanPreferencesKey("navidrome_enabled")
+        val NAVIDROME_SYNC_PLAYLIST_IDS = stringPreferencesKey("navidrome_sync_playlist_ids")
+        val LAST_MUSIC_SYNC_TIME = stringPreferencesKey("last_music_sync_time")
     }
 
     // Connection
@@ -128,6 +130,15 @@ class SettingsRepository @Inject constructor(
     val navidromeUsername: Flow<String> = context.dataStore.data.map { it[NAVIDROME_USERNAME] ?: "" }
     val navidromePassword: Flow<String> = context.dataStore.data.map { it[NAVIDROME_PASSWORD] ?: "" }
     val navidromeEnabled: Flow<Boolean> = context.dataStore.data.map { it[NAVIDROME_ENABLED] ?: false }
+    val navidromeSyncPlaylistIds: Flow<Set<String>> = context.dataStore.data.map {
+        (it[NAVIDROME_SYNC_PLAYLIST_IDS] ?: "").split(",").filter { id -> id.isNotBlank() }.toSet()
+    }
+
+    val lastMusicSyncTime: Flow<String> = context.dataStore.data.map { it[LAST_MUSIC_SYNC_TIME] ?: "Never" }
+
+    suspend fun saveSyncPlaylistIds(ids: Set<String>) {
+        context.dataStore.edit { it[NAVIDROME_SYNC_PLAYLIST_IDS] = ids.joinToString(",") }
+    }
 
     val isConfigured: Flow<Boolean> = context.dataStore.data.map {
         val hasImmich = !it[SERVER_URL].isNullOrBlank() && !it[API_KEY].isNullOrBlank()

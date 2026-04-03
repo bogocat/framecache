@@ -56,6 +56,9 @@ class SlideshowViewModel @Inject constructor(
     val imageScale = settings.imageScale.stateIn(viewModelScope, SharingStarted.Eagerly, "fit")
     val showProgressBar = settings.showProgressBar.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // Music
+    val navidromeEnabled = settings.navidromeEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // Sleep
     val sleepEnabled = settings.sleepEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val sleepStartHour = settings.sleepStartHour.stateIn(viewModelScope, SharingStarted.Eagerly, 22)

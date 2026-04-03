@@ -11,9 +11,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Database(entities = [CachedAsset::class], version = 2, exportSchema = false)
+@Database(
+    entities = [CachedAsset::class, CachedSong::class, CachedPlaylist::class],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun assetDao(): AssetDao
+    abstract fun songDao(): SongDao
 }
 
 @Module
@@ -32,4 +37,7 @@ object DatabaseModule {
 
     @Provides
     fun provideAssetDao(db: AppDatabase): AssetDao = db.assetDao()
+
+    @Provides
+    fun provideSongDao(db: AppDatabase): SongDao = db.songDao()
 }
