@@ -86,7 +86,8 @@ class MainActivity : ComponentActivity() {
                             musicPlayer = musicPlayer,
                             songDao = songDao,
                             settings = settings,
-                            onBack = { screen = "slideshow" }
+                            onBack = { screen = "slideshow" },
+                            onOpenSettings = { screen = "settings" }
                         )
                     }
                     else -> {

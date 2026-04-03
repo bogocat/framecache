@@ -60,8 +60,8 @@ class NavidromeClient @Inject constructor(
         return Pair(album, album.song.orEmpty())
     }
 
-    suspend fun getAlbumList(type: String = "recent", size: Int = 20): List<Album> {
-        return api.getAlbumList(type, size).response.albumList2?.album.orEmpty()
+    suspend fun getAlbumList(type: String = "recent", size: Int = 20, offset: Int = 0): List<Album> {
+        return api.getAlbumList(type, size, offset).response.albumList2?.album.orEmpty()
     }
 
     suspend fun getArtist(id: String): Pair<Artist, List<Album>> {

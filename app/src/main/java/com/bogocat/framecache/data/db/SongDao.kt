@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 @Dao
 interface SongDao {
@@ -13,19 +14,30 @@ interface SongDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongs(songs: List<CachedSong>)
 
-    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL ORDER BY RANDOM() LIMIT :limit")
+    @Query("SELECT * FROM cached_songs WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): CachedSong?
+
+    @Query("SELECT * FROM cached_songs ORDER BY artist ASC, album ASC, track ASC, title ASC")
+    suspend fun getAllSongs(): List<CachedSong>
+
+    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY artist ASC, album ASC, track ASC, title ASC")
+    suspend fun getAllCachedSongs(): List<CachedSong>
+
+    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY RANDOM() LIMIT :limit")
     suspend fun getRandomCached(limit: Int): List<CachedSong>
 
-    @Query("SELECT * FROM cached_songs WHERE playlistId = :playlistId ORDER BY track ASC, title ASC")
-    suspend fun getSongsForPlaylist(playlistId: String): List<CachedSong>
-
-    @Query("SELECT * FROM cached_songs ORDER BY playCount ASC, RANDOM() LIMIT :limit")
+    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY playCount ASC, RANDOM() LIMIT :limit")
     suspend fun getShuffleQueue(limit: Int = 50): List<CachedSong>
 
-    @Query("SELECT * FROM cached_songs WHERE filePath IS NULL LIMIT :limit")
+    @Query("SELECT * FROM cached_songs WHERE (filePath IS NULL OR filePath = '') LIMIT :limit")
     suspend fun getUncachedSongs(limit: Int): List<CachedSong>
 
-    @Query("SELECT * FROM cached_songs WHERE (filePath IS NULL OR filePath = '') AND playlistId IN (:playlistIds) LIMIT :limit")
+    @Query("""
+        SELECT s.* FROM cached_songs s
+        INNER JOIN playlist_songs ps ON s.id = ps.songId
+        WHERE ps.playlistId IN (:playlistIds) AND (s.filePath IS NULL OR s.filePath = '')
+        LIMIT :limit
+    """)
     suspend fun getUncachedSongsForPlaylists(playlistIds: List<String>, limit: Int): List<CachedSong>
 
     @Query("UPDATE cached_songs SET filePath = :path, fileSize = :size WHERE id = :id")
@@ -37,32 +49,39 @@ interface SongDao {
     @Query("UPDATE cached_songs SET playCount = playCount + 1, lastPlayed = :now WHERE id = :id")
     suspend fun markPlayed(id: String, now: Long = System.currentTimeMillis())
 
-    @Query("SELECT COUNT(*) FROM cached_songs WHERE filePath IS NOT NULL")
+    @Query("SELECT COUNT(*) FROM cached_songs WHERE filePath IS NOT NULL AND filePath != ''")
     suspend fun getCachedCount(): Int
 
     @Query("SELECT COUNT(*) FROM cached_songs")
     suspend fun getTotalCount(): Int
 
-    @Query("SELECT COALESCE(SUM(fileSize), 0) FROM cached_songs WHERE filePath IS NOT NULL")
+    @Query("SELECT COALESCE(SUM(fileSize), 0) FROM cached_songs WHERE filePath IS NOT NULL AND filePath != ''")
     suspend fun getCachedSizeBytes(): Long
 
-    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL ORDER BY lastPlayed ASC LIMIT :count")
+    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY lastPlayed ASC LIMIT :count")
     suspend fun getOldestPlayed(count: Int): List<CachedSong>
 
     @Query("DELETE FROM cached_songs WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("DELETE FROM cached_songs WHERE playlistId = :playlistId")
-    suspend fun deleteByPlaylist(playlistId: String)
-
-    @Query("SELECT * FROM cached_songs WHERE id = :id LIMIT 1")
-    suspend fun getById(id: String): CachedSong?
+    // -- Artists --
 
     @Query("SELECT DISTINCT artist FROM cached_songs ORDER BY artist ASC")
     suspend fun getAllArtists(): List<String>
 
+    @Query("SELECT DISTINCT artist FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY artist ASC")
+    suspend fun getCachedArtists(): List<String>
+
     @Query("SELECT * FROM cached_songs WHERE artist = :artist ORDER BY album ASC, track ASC, title ASC")
     suspend fun getSongsByArtist(artist: String): List<CachedSong>
+
+    // -- Albums --
+
+    @Query("SELECT DISTINCT albumId, album, artist, coverArt, year FROM cached_songs ORDER BY artist ASC, album ASC")
+    suspend fun getAllAlbums(): List<AlbumSummary>
+
+    @Query("SELECT * FROM cached_songs WHERE albumId = :albumId ORDER BY track ASC, title ASC")
+    suspend fun getSongsByAlbum(albumId: String): List<CachedSong>
 
     // -- Playlists --
 
@@ -75,6 +94,37 @@ interface SongDao {
     @Query("DELETE FROM cached_playlists WHERE id NOT IN (:keepIds)")
     suspend fun prunePlaylists(keepIds: List<String>)
 
-    @Query("DELETE FROM cached_playlists")
-    suspend fun deleteAllPlaylists()
+    // -- Playlist Songs (junction) --
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylistSongs(items: List<PlaylistSong>)
+
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId")
+    suspend fun clearPlaylistSongs(playlistId: String)
+
+    @Query("""
+        SELECT s.* FROM cached_songs s
+        INNER JOIN playlist_songs ps ON s.id = ps.songId
+        WHERE ps.playlistId = :playlistId
+        ORDER BY ps.trackOrder ASC
+    """)
+    suspend fun getSongsForPlaylist(playlistId: String): List<CachedSong>
+
+    // -- Search --
+
+    @Query("SELECT * FROM cached_songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY artist ASC, album ASC, track ASC LIMIT 100")
+    suspend fun search(query: String): List<CachedSong>
+
+    // -- Sync metadata --
+
+    @Query("SELECT MAX(cachedAt) FROM cached_songs")
+    suspend fun getLastSongSyncTime(): Long?
 }
+
+data class AlbumSummary(
+    val albumId: String,
+    val album: String,
+    val artist: String,
+    val coverArt: String?,
+    val year: Int?
+)

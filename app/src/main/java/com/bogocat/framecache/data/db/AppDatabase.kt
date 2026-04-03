@@ -12,8 +12,8 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Database(
-    entities = [CachedAsset::class, CachedSong::class, CachedPlaylist::class],
-    version = 3,
+    entities = [CachedAsset::class, CachedSong::class, CachedPlaylist::class, PlaylistSong::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

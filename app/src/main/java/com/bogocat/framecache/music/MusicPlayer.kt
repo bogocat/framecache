@@ -213,6 +213,35 @@ class MusicPlayer @Inject constructor(
         play(q.items[prevIndex])
     }
 
+    fun removeFromQueue(index: Int) {
+        val q = _queue.value
+        if (index < 0 || index >= q.items.size) return
+        val newItems = q.items.toMutableList().apply { removeAt(index) }
+        val newIndex = when {
+            newItems.isEmpty() -> -1
+            index < q.currentIndex -> q.currentIndex - 1
+            index == q.currentIndex -> q.currentIndex.coerceAtMost(newItems.size - 1)
+            else -> q.currentIndex
+        }
+        _queue.value = q.copy(items = newItems, currentIndex = newIndex)
+    }
+
+    fun clearQueue() {
+        player?.stop()
+        _queue.value = QueueState()
+        _nowPlaying.value = NowPlaying()
+    }
+
+    suspend fun addToQueue(song: Song) {
+        val q = _queue.value
+        _queue.value = q.copy(items = q.items + song)
+    }
+
+    suspend fun addToQueue(songs: List<Song>) {
+        val q = _queue.value
+        _queue.value = q.copy(items = q.items + songs)
+    }
+
     fun togglePlayPause() {
         val exo = player ?: return
         if (exo.isPlaying) exo.pause() else exo.play()
@@ -247,6 +276,7 @@ class MusicPlayer @Inject constructor(
         artist = artist,
         album = album,
         albumId = albumId,
+        artistId = artistId,
         coverArt = coverArt,
         duration = duration,
         track = track,

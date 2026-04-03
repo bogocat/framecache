@@ -10,16 +10,23 @@ data class CachedSong(
     val artist: String = "",
     val album: String = "",
     val albumId: String = "",
+    val artistId: String = "",
     val coverArt: String? = null,
     val duration: Int = 0,
     val track: Int? = null,
     val year: Int? = null,
     val genre: String? = null,
-    val playlistId: String? = null,
     val filePath: String? = null,
     val coverPath: String? = null,
     val cachedAt: Long = System.currentTimeMillis(),
     val playCount: Int = 0,
     val lastPlayed: Long? = null,
     val fileSize: Long = 0
+)
+
+@Entity(tableName = "playlist_songs", primaryKeys = ["playlistId", "songId"])
+data class PlaylistSong(
+    val playlistId: String,
+    val songId: String,
+    val trackOrder: Int = 0
 )
