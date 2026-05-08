@@ -72,6 +72,10 @@ class SlideshowViewModel @Inject constructor(
 
     private var slideshowJob: Job? = null
 
+    // Bumped on manual skip; the timer loop checks this to abandon stale iterations
+    // so a skip at e.g. 40/45s gives the next photo a fresh full duration.
+    @Volatile private var advanceGeneration: Int = 0
+
     // Pushed by SlideshowScreen on configuration changes; drives pair direction.
     @Volatile private var isDeviceLandscape: Boolean = true
 
@@ -110,11 +114,13 @@ class SlideshowViewModel @Inject constructor(
 
             // Slideshow loop with progress tracking
             while (true) {
+                val gen = advanceGeneration
                 val duration = settings.duration.first()
                 val stepMs = 100L
                 val totalSteps = (duration * 1000L) / stepMs
 
                 for (step in 0..totalSteps) {
+                    if (advanceGeneration != gen) break
                     if (_state.value.isPaused) {
                         delay(stepMs)
                         continue
@@ -123,7 +129,11 @@ class SlideshowViewModel @Inject constructor(
                     delay(stepMs)
                 }
 
-                advance()
+                // Only auto-advance if no manual skip happened during this cycle.
+                if (advanceGeneration == gen) {
+                    advanceGeneration++
+                    advance()
+                }
             }
         }
     }
@@ -184,12 +194,16 @@ class SlideshowViewModel @Inject constructor(
     }
 
     fun nextImage() {
-        viewModelScope.launch { advance() }
+        viewModelScope.launch {
+            advanceGeneration++
+            advance()
+        }
     }
 
     fun previousImage() {
         viewModelScope.launch {
             if (historyIndex > 0) {
+                advanceGeneration++
                 historyIndex--
                 val prev = history[historyIndex]
                 _state.value = _state.value.copy(currentAsset = prev, progress = 0f)
