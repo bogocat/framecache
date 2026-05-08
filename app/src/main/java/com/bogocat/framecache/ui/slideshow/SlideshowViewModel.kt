@@ -156,12 +156,28 @@ class SlideshowViewModel @Inject constructor(
 
     // Pair when the photo's orientation is opposite the device's orientation,
     // so two portraits fill a landscape frame, two landscapes stack on a portrait frame.
+    // Prefer a partner from the same time period: 7d → 30d → 365d → any.
     private suspend fun pairPartnerFor(asset: CachedAsset): CachedAsset? {
         val w = asset.width ?: return null
         val h = asset.height ?: return null
         val isPhotoPortrait = h > w
         val shouldPair = isPhotoPortrait == isDeviceLandscape
         if (!shouldPair) return null
+
+        val date = asset.dateTaken
+        if (date != null) {
+            val day = 86_400_000L
+            for (windowDays in listOf(7L, 30L, 365L)) {
+                val min = date - windowDays * day
+                val max = date + windowDays * day
+                val partner = if (isPhotoPortrait) {
+                    assetDao.getNextPortraitNearDate(asset.id, min, max)
+                } else {
+                    assetDao.getNextLandscapeNearDate(asset.id, min, max)
+                }
+                if (partner != null) return partner
+            }
+        }
         return if (isPhotoPortrait) assetDao.getNextPortrait(asset.id)
                else                 assetDao.getNextLandscape(asset.id)
     }

@@ -23,6 +23,12 @@ interface AssetDao {
     @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextPortrait(excludeId: String = ""): CachedAsset?
 
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextLandscapeNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
+
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextPortraitNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
+
     @Query("UPDATE cached_assets SET displayCount = displayCount + 1, lastDisplayed = :now WHERE id = :id")
     suspend fun markDisplayed(id: String, now: Long = System.currentTimeMillis())
 
