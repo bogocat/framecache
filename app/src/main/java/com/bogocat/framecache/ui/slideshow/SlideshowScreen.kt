@@ -191,6 +191,7 @@ fun SlideshowScreen(
             // Metadata overlay
             MetadataOverlay(
                 asset = asset,
+                secondAsset = state.secondAsset,
                 showClock = showClock,
                 showDate = showDate,
                 showPhotoDate = showPhotoDate,

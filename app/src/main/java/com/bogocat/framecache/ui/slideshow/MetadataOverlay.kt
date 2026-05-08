@@ -2,6 +2,7 @@ package com.bogocat.framecache.ui.slideshow
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ private fun Pill(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 @Composable
 fun MetadataOverlay(
     asset: CachedAsset?,
+    secondAsset: CachedAsset? = null,
     showClock: Boolean,
     showDate: Boolean,
     showPhotoDate: Boolean,
@@ -93,63 +95,103 @@ fun MetadataOverlay(
             }
         }
 
-        // Bottom-left: photo info (date, location, camera, rating, people)
-        val hasPhotoInfo = (showPhotoDate && asset?.dateTaken != null) ||
-            (showLocation && asset?.location != null) ||
-            (showCamera && asset?.cameraModel != null) ||
-            (showRating && asset?.rating != null && asset.rating > 0) ||
-            (showPeople && asset?.peopleName != null)
+        // Bottom-left: left photo's info pill
+        PhotoInfoPill(
+            asset = asset,
+            alignment = Alignment.BottomStart,
+            showPhotoDate = showPhotoDate,
+            showLocation = showLocation,
+            showDescription = showDescription,
+            showPeople = showPeople,
+            showCamera = showCamera,
+            showRating = showRating,
+            showPersonAge = showPersonAge,
+            dateFormat = dateFormat
+        )
 
-        if (hasPhotoInfo) {
-            Pill(modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)) {
-                Column {
-                    if (showPhotoDate && asset?.dateTaken != null) {
-                        Text(
-                            text = formatDate(dateFormat, asset.dateTaken),
-                            color = Color.White,
-                            fontSize = 15.sp
-                        )
-                    }
-                    if (showLocation && asset?.location != null) {
-                        Text(
-                            text = asset.location,
-                            color = Color(0xCCFFFFFF),
-                            fontSize = 13.sp
-                        )
-                    }
-                    if (showCamera && asset?.cameraModel != null) {
-                        Text(
-                            text = asset.cameraModel,
-                            color = Color(0x99FFFFFF),
-                            fontSize = 11.sp
-                        )
-                    }
-                    if (showRating && asset?.rating != null && asset.rating > 0) {
-                        Text(
-                            text = "\u2605".repeat(asset.rating) + "\u2606".repeat(5 - asset.rating),
-                            color = Color(0xFFFFD700),
-                            fontSize = 13.sp
-                        )
-                    }
-                    if (showPeople && asset?.peopleName != null) {
-                        val peopleText = if (showPersonAge && asset.peopleBirthDates != null && asset.dateTaken != null) {
-                            formatPeopleWithAge(asset.peopleName, asset.peopleBirthDates, asset.dateTaken)
-                        } else {
-                            asset.peopleName
-                        }
-                        Text(
-                            text = peopleText,
-                            color = Color(0xCCFFFFFF),
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            }
+        // Bottom-right: right photo's info pill (only when paired)
+        if (secondAsset != null) {
+            PhotoInfoPill(
+                asset = secondAsset,
+                alignment = Alignment.BottomEnd,
+                showPhotoDate = showPhotoDate,
+                showLocation = showLocation,
+                showDescription = showDescription,
+                showPeople = showPeople,
+                showCamera = showCamera,
+                showRating = showRating,
+                showPersonAge = showPersonAge,
+                dateFormat = dateFormat
+            )
         }
+    }
+}
 
-        // Bottom-right: description
-        if (showDescription && asset?.description != null) {
-            Pill(modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
+@Composable
+private fun BoxScope.PhotoInfoPill(
+    asset: CachedAsset?,
+    alignment: Alignment,
+    showPhotoDate: Boolean,
+    showLocation: Boolean,
+    showDescription: Boolean,
+    showPeople: Boolean,
+    showCamera: Boolean,
+    showRating: Boolean,
+    showPersonAge: Boolean,
+    dateFormat: String
+) {
+    val hasInfo = (showPhotoDate && asset?.dateTaken != null) ||
+        (showLocation && asset?.location != null) ||
+        (showCamera && asset?.cameraModel != null) ||
+        (showRating && asset?.rating != null && asset.rating > 0) ||
+        (showPeople && asset?.peopleName != null) ||
+        (showDescription && asset?.description != null)
+
+    if (!hasInfo) return
+
+    Pill(modifier = Modifier.align(alignment).padding(20.dp)) {
+        Column {
+            if (showPhotoDate && asset?.dateTaken != null) {
+                Text(
+                    text = formatDate(dateFormat, asset.dateTaken),
+                    color = Color.White,
+                    fontSize = 15.sp
+                )
+            }
+            if (showLocation && asset?.location != null) {
+                Text(
+                    text = asset.location,
+                    color = Color(0xCCFFFFFF),
+                    fontSize = 13.sp
+                )
+            }
+            if (showCamera && asset?.cameraModel != null) {
+                Text(
+                    text = asset.cameraModel,
+                    color = Color(0x99FFFFFF),
+                    fontSize = 11.sp
+                )
+            }
+            if (showRating && asset?.rating != null && asset.rating > 0) {
+                Text(
+                    text = "\u2605".repeat(asset.rating) + "\u2606".repeat(5 - asset.rating),
+                    color = Color(0xFFFFD700),
+                    fontSize = 13.sp
+                )
+            }
+            if (showPeople && asset?.peopleName != null) {
+                val peopleText = if (showPersonAge && asset.peopleBirthDates != null && asset.dateTaken != null) {
+                    formatPeopleWithAge(asset.peopleName, asset.peopleBirthDates, asset.dateTaken)
+                } else {
+                    asset.peopleName
+                }
+                Text(
+                    text = peopleText,
+                    color = Color(0xCCFFFFFF),
+                    fontSize = 13.sp
+                )
+            }
+            if (showDescription && asset?.description != null) {
                 Text(
                     text = asset.description,
                     color = Color.White,
