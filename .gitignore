@@ -6,3 +6,8 @@ local.properties
 *.iml
 .idea/
 .DS_Store
+
+# Release signing — keystore lives at ~/.framecache/release.jks, backed up in Vaultwarden
+keystore.properties
+*.jks
+*.keystore
