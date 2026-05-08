@@ -92,7 +92,6 @@ fun SettingsScreen(
     val imageScale by settings.imageScale.collectAsState(initial = "fit")
     val showProgressBar by settings.showProgressBar.collectAsState(initial = false)
     val photoOrder by settings.photoOrder.collectAsState(initial = "random")
-    val orientationFilter by settings.photoOrientationFilter.collectAsState(initial = "all")
     val favoritesOnly by settings.favoritesOnly.collectAsState(initial = false)
     val clockFormat by settings.clockFormat.collectAsState(initial = "12")
     val showRating by settings.showRating.collectAsState(initial = false)
@@ -467,27 +466,6 @@ fun SettingsScreen(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = if (photoOrder == value) Color.Black else textColor,
                             containerColor = if (photoOrder == value) sectionColor else Color.Transparent
-                        ),
-                        modifier = Modifier.height(36.dp)
-                    ) { Text(label, fontSize = 12.sp) }
-                }
-            }
-        }
-
-        // Orientation filter
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Photos", color = textColor, fontSize = 16.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("all" to "All", "landscape" to "Landscape", "portrait" to "Portrait").forEach { (value, label) ->
-                    OutlinedButton(
-                        onClick = { scope.launch { settings.save(SettingsRepository.PHOTO_ORIENTATION_FILTER, value) } },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (orientationFilter == value) Color.Black else textColor,
-                            containerColor = if (orientationFilter == value) sectionColor else Color.Transparent
                         ),
                         modifier = Modifier.height(36.dp)
                     ) { Text(label, fontSize = 12.sp) }

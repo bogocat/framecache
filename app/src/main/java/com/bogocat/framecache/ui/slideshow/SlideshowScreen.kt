@@ -5,11 +5,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,6 +79,10 @@ fun SlideshowScreen(
     val sleepStartHour by viewModel.sleepStartHour.collectAsState()
     val sleepEndHour by viewModel.sleepEndHour.collectAsState()
     val sleepDim by viewModel.sleepDim.collectAsState()
+
+    // Reactive device orientation — re-composes on rotation.
+    val isLandscapeDevice = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LaunchedEffect(isLandscapeDevice) { viewModel.setDeviceLandscape(isLandscapeDevice) }
 
     // Check if in sleep hours
     var isSleeping by remember { mutableStateOf(false) }
@@ -152,55 +159,59 @@ fun SlideshowScreen(
                 label = "slideshow",
                 contentKey = { it.first.id + (it.second?.id ?: "") }
             ) { (displayAsset, displaySecond) ->
-                if (displaySecond != null) {
-                    // Side-by-side portrait pair
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            PhotoDisplay(
-                                asset = displayAsset,
-                                durationMs = 45_000,
-                                kenBurnsEnabled = kenBurnsEnabled,
-                                kenBurnsZoom = kenBurnsZoom,
-                                backgroundBlur = false,
-                                imageScale = "fit"
-                            )
-                        }
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            PhotoDisplay(
-                                asset = displaySecond,
-                                durationMs = 45_000,
-                                kenBurnsEnabled = kenBurnsEnabled,
-                                kenBurnsZoom = kenBurnsZoom,
-                                backgroundBlur = false,
-                                imageScale = "fit"
-                            )
-                        }
-                    }
-                } else {
+                // Pair makes sense only when the photo orientation is opposite the device orientation.
+                // Guards rotation-mid-display: a stale pair is dropped to solo until next advance.
+                val photoIsPortrait = displayAsset.width != null && displayAsset.height != null &&
+                    displayAsset.height > displayAsset.width
+                val showPair = displaySecond != null && (photoIsPortrait != isLandscapeDevice)
+
+                @Composable
+                fun cell(a: CachedAsset, blur: Boolean, scale: String) {
                     PhotoDisplay(
-                        asset = displayAsset,
+                        asset = a,
                         durationMs = 45_000,
                         kenBurnsEnabled = kenBurnsEnabled,
                         kenBurnsZoom = kenBurnsZoom,
-                        backgroundBlur = backgroundBlur,
-                        imageScale = imageScale
+                        backgroundBlur = blur,
+                        imageScale = scale
                     )
+                    PhotoInfoPill(
+                        asset = a,
+                        alignment = Alignment.BottomStart,
+                        showPhotoDate = showPhotoDate,
+                        showLocation = showLocation,
+                        showDescription = showDescription,
+                        showPeople = showPeople,
+                        showCamera = showCamera,
+                        showRating = showRating,
+                        showPersonAge = showPersonAge,
+                        dateFormat = dateFormat
+                    )
+                }
+
+                when {
+                    showPair && displaySecond != null && isLandscapeDevice -> {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxHeight()) { cell(displayAsset, blur = false, scale = "fit") }
+                            Box(modifier = Modifier.weight(1f).fillMaxHeight()) { cell(displaySecond, blur = false, scale = "fit") }
+                        }
+                    }
+                    showPair && displaySecond != null -> {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) { cell(displayAsset, blur = false, scale = "fit") }
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) { cell(displaySecond, blur = false, scale = "fit") }
+                        }
+                    }
+                    else -> {
+                        Box(modifier = Modifier.fillMaxSize()) { cell(displayAsset, blur = backgroundBlur, scale = imageScale) }
+                    }
                 }
             }
 
-            // Metadata overlay
+            // Global overlay (clock + current date only)
             MetadataOverlay(
-                asset = asset,
-                secondAsset = state.secondAsset,
                 showClock = showClock,
                 showDate = showDate,
-                showPhotoDate = showPhotoDate,
-                showLocation = showLocation,
-                showDescription = showDescription,
-                showPeople = showPeople,
-                showCamera = showCamera,
-                showRating = showRating,
-                showPersonAge = showPersonAge,
                 clockFormat = clockFormat,
                 dateFormat = dateFormat
             )

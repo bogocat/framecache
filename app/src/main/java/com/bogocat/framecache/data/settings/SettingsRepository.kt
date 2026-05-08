@@ -38,7 +38,6 @@ class SettingsRepository @Inject constructor(
         val IMAGE_SCALE = stringPreferencesKey("image_scale")
         val SHOW_PROGRESS_BAR = booleanPreferencesKey("show_progress_bar")
         val PHOTO_ORDER = stringPreferencesKey("photo_order")
-        val PHOTO_ORIENTATION_FILTER = stringPreferencesKey("photo_orientation_filter")
         val FAVORITES_ONLY = booleanPreferencesKey("favorites_only")
         val CLOCK_FORMAT = stringPreferencesKey("clock_format")
         val SHOW_RATING = booleanPreferencesKey("show_rating")
@@ -94,7 +93,6 @@ class SettingsRepository @Inject constructor(
     val imageScale: Flow<String> = context.dataStore.data.map { it[IMAGE_SCALE] ?: "fit" }
     val showProgressBar: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PROGRESS_BAR] ?: false }
     val photoOrder: Flow<String> = context.dataStore.data.map { it[PHOTO_ORDER] ?: "random" }
-    val photoOrientationFilter: Flow<String> = context.dataStore.data.map { it[PHOTO_ORIENTATION_FILTER] ?: "all" }
     val favoritesOnly: Flow<Boolean> = context.dataStore.data.map { it[FAVORITES_ONLY] ?: false }
     val clockFormat: Flow<String> = context.dataStore.data.map { it[CLOCK_FORMAT] ?: "12" }
     val showRating: Flow<Boolean> = context.dataStore.data.map { it[SHOW_RATING] ?: false }

@@ -44,21 +44,14 @@ private fun Pill(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 
 @Composable
 fun MetadataOverlay(
-    asset: CachedAsset?,
-    secondAsset: CachedAsset? = null,
     showClock: Boolean,
     showDate: Boolean,
-    showPhotoDate: Boolean,
-    showLocation: Boolean,
-    showDescription: Boolean,
-    showPeople: Boolean,
-    showCamera: Boolean,
-    showRating: Boolean = false,
-    showPersonAge: Boolean = false,
     clockFormat: String = "12",
     dateFormat: String,
     modifier: Modifier = Modifier
 ) {
+    if (!showClock && !showDate) return
+
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) {
@@ -69,66 +62,32 @@ fun MetadataOverlay(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-
-        // Top-left: clock and current date
-        if (showClock || showDate) {
-            Pill(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
-                Column {
-                    if (showClock) {
-                        val clockFmt = if (clockFormat == "24") "HH:mm" else "h:mm a"
-                        Text(
-                            text = SimpleDateFormat(clockFmt, Locale.getDefault())
-                                .format(Date(currentTime)),
-                            color = Color.White,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Light
-                        )
-                    }
-                    if (showDate) {
-                        Text(
-                            text = formatDate(dateFormat, currentTime),
-                            color = Color(0xCCFFFFFF),
-                            fontSize = 13.sp
-                        )
-                    }
+        Pill(modifier = Modifier.align(Alignment.TopStart).padding(20.dp)) {
+            Column {
+                if (showClock) {
+                    val clockFmt = if (clockFormat == "24") "HH:mm" else "h:mm a"
+                    Text(
+                        text = SimpleDateFormat(clockFmt, Locale.getDefault())
+                            .format(Date(currentTime)),
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Light
+                    )
+                }
+                if (showDate) {
+                    Text(
+                        text = formatDate(dateFormat, currentTime),
+                        color = Color(0xCCFFFFFF),
+                        fontSize = 13.sp
+                    )
                 }
             }
-        }
-
-        // Bottom-left: left photo's info pill
-        PhotoInfoPill(
-            asset = asset,
-            alignment = Alignment.BottomStart,
-            showPhotoDate = showPhotoDate,
-            showLocation = showLocation,
-            showDescription = showDescription,
-            showPeople = showPeople,
-            showCamera = showCamera,
-            showRating = showRating,
-            showPersonAge = showPersonAge,
-            dateFormat = dateFormat
-        )
-
-        // Bottom-right: right photo's info pill (only when paired)
-        if (secondAsset != null) {
-            PhotoInfoPill(
-                asset = secondAsset,
-                alignment = Alignment.BottomEnd,
-                showPhotoDate = showPhotoDate,
-                showLocation = showLocation,
-                showDescription = showDescription,
-                showPeople = showPeople,
-                showCamera = showCamera,
-                showRating = showRating,
-                showPersonAge = showPersonAge,
-                dateFormat = dateFormat
-            )
         }
     }
 }
 
 @Composable
-private fun BoxScope.PhotoInfoPill(
+fun BoxScope.PhotoInfoPill(
     asset: CachedAsset?,
     alignment: Alignment,
     showPhotoDate: Boolean,

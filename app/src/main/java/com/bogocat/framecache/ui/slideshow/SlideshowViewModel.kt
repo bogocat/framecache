@@ -72,6 +72,13 @@ class SlideshowViewModel @Inject constructor(
 
     private var slideshowJob: Job? = null
 
+    // Pushed by SlideshowScreen on configuration changes; drives pair direction.
+    @Volatile private var isDeviceLandscape: Boolean = true
+
+    fun setDeviceLandscape(landscape: Boolean) {
+        isDeviceLandscape = landscape
+    }
+
     init {
         startSlideshow()
     }
@@ -90,12 +97,8 @@ class SlideshowViewModel @Inject constructor(
             val first = getNextFiltered()
             if (first != null) {
                 assetDao.markDisplayed(first.id)
-                var second: CachedAsset? = null
-                val isPortrait = first.height != null && first.width != null && first.height > first.width
-                if (isPortrait) {
-                    second = assetDao.getNextPortrait(first.id)
-                    if (second != null) assetDao.markDisplayed(second.id)
-                }
+                val second = pairPartnerFor(first)
+                if (second != null) assetDao.markDisplayed(second.id)
                 history.add(first)
                 historyIndex = 0
                 _state.value = _state.value.copy(
@@ -127,36 +130,38 @@ class SlideshowViewModel @Inject constructor(
 
     private suspend fun getNextFiltered(): CachedAsset? {
         val order = settings.photoOrder.first()
-        val orientationFilter = settings.photoOrientationFilter.first()
         val favOnly = settings.favoritesOnly.first()
         val currentId = _state.value.currentAsset?.id ?: ""
 
-        // Try filtered query first, fall back to unfiltered if no matches
         val filtered = when {
             favOnly -> assetDao.getNextFavorite(currentId)
-            orientationFilter == "landscape" -> assetDao.getNextLandscape(currentId)
-            orientationFilter == "portrait" -> assetDao.getNextPortrait(currentId)
             order == "chronological" -> assetDao.getNextChronological(currentId)
             else -> null
         }
 
-        // Fall back: try without excluding current, then try unfiltered
         return filtered
             ?: assetDao.getNextRandom(currentId)
             ?: assetDao.getNextRandom("")
+    }
+
+    // Pair when the photo's orientation is opposite the device's orientation,
+    // so two portraits fill a landscape frame, two landscapes stack on a portrait frame.
+    private suspend fun pairPartnerFor(asset: CachedAsset): CachedAsset? {
+        val w = asset.width ?: return null
+        val h = asset.height ?: return null
+        val isPhotoPortrait = h > w
+        val shouldPair = isPhotoPortrait == isDeviceLandscape
+        if (!shouldPair) return null
+        return if (isPhotoPortrait) assetDao.getNextPortrait(asset.id)
+               else                 assetDao.getNextLandscape(asset.id)
     }
 
     private suspend fun advance() {
         val next = getNextFiltered() ?: return
         assetDao.markDisplayed(next.id)
 
-        // If portrait, try to pair with another portrait for side-by-side
-        var second: CachedAsset? = null
-        val isPortrait = next.height != null && next.width != null && next.height > next.width
-        if (isPortrait) {
-            second = assetDao.getNextPortrait(next.id)
-            if (second != null) assetDao.markDisplayed(second.id)
-        }
+        val second = pairPartnerFor(next)
+        if (second != null) assetDao.markDisplayed(second.id)
 
         // Add to history (keep last 50)
         if (historyIndex < history.size - 1) {
