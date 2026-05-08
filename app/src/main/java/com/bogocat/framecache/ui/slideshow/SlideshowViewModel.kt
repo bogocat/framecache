@@ -20,6 +20,7 @@ import javax.inject.Inject
 
 data class SlideshowState(
     val currentAsset: CachedAsset? = null,
+    val secondAsset: CachedAsset? = null,  // side-by-side portrait pair
     val cachedCount: Int = 0,
     val isPaused: Boolean = false,
     val progress: Float = 0f
@@ -89,10 +90,17 @@ class SlideshowViewModel @Inject constructor(
             val first = getNextFiltered()
             if (first != null) {
                 assetDao.markDisplayed(first.id)
+                var second: CachedAsset? = null
+                val isPortrait = first.height != null && first.width != null && first.height > first.width
+                if (isPortrait) {
+                    second = assetDao.getNextPortrait(first.id)
+                    if (second != null) assetDao.markDisplayed(second.id)
+                }
                 history.add(first)
                 historyIndex = 0
                 _state.value = _state.value.copy(
                     currentAsset = first,
+                    secondAsset = second,
                     cachedCount = assetDao.getCachedCount()
                 )
             }
@@ -142,9 +150,16 @@ class SlideshowViewModel @Inject constructor(
         val next = getNextFiltered() ?: return
         assetDao.markDisplayed(next.id)
 
+        // If portrait, try to pair with another portrait for side-by-side
+        var second: CachedAsset? = null
+        val isPortrait = next.height != null && next.width != null && next.height > next.width
+        if (isPortrait) {
+            second = assetDao.getNextPortrait(next.id)
+            if (second != null) assetDao.markDisplayed(second.id)
+        }
+
         // Add to history (keep last 50)
         if (historyIndex < history.size - 1) {
-            // Trim future if we navigated back then advanced
             while (history.size > historyIndex + 1) history.removeAt(history.size - 1)
         }
         history.add(next)
@@ -153,6 +168,7 @@ class SlideshowViewModel @Inject constructor(
 
         _state.value = _state.value.copy(
             currentAsset = next,
+            secondAsset = second,
             cachedCount = assetDao.getCachedCount(),
             progress = 0f
         )

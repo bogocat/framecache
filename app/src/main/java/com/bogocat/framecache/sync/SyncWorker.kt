@@ -207,8 +207,8 @@ class SyncWorker @AssistedInject constructor(
             peopleBirthDates = birthDates,
             rating = exifInfo?.rating,
             isFavorite = isFavorite,
-            width = width,
-            height = height
+            width = width ?: exifInfo?.exifImageWidth,
+            height = height ?: exifInfo?.exifImageHeight
         )
     }
 

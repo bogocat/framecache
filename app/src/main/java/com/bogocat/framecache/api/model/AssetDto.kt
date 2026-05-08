@@ -22,7 +22,9 @@ data class ExifInfoDto(
     val make: String? = null,
     val model: String? = null,
     val dateTimeOriginal: String? = null,
-    val rating: Int? = null
+    val rating: Int? = null,
+    val exifImageWidth: Int? = null,
+    val exifImageHeight: Int? = null
 )
 
 data class PersonDto(

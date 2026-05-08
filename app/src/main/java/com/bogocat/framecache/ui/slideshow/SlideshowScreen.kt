@@ -11,6 +11,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -139,23 +141,51 @@ fun SlideshowScreen(
                 }
             }
         } else {
+            val secondAsset = state.secondAsset
+
             AnimatedContent(
-                targetState = asset,
+                targetState = Pair(asset, secondAsset),
                 transitionSpec = {
                     fadeIn(animationSpec = tween(crossfadeDuration)) togetherWith
                         fadeOut(animationSpec = tween(crossfadeDuration))
                 },
                 label = "slideshow",
-                contentKey = { it.id }
-            ) { displayAsset ->
-                PhotoDisplay(
-                    asset = displayAsset,
-                    durationMs = 45_000,
-                    kenBurnsEnabled = kenBurnsEnabled,
-                    kenBurnsZoom = kenBurnsZoom,
-                    backgroundBlur = backgroundBlur,
-                    imageScale = imageScale
-                )
+                contentKey = { it.first.id + (it.second?.id ?: "") }
+            ) { (displayAsset, displaySecond) ->
+                if (displaySecond != null) {
+                    // Side-by-side portrait pair
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            PhotoDisplay(
+                                asset = displayAsset,
+                                durationMs = 45_000,
+                                kenBurnsEnabled = kenBurnsEnabled,
+                                kenBurnsZoom = kenBurnsZoom,
+                                backgroundBlur = false,
+                                imageScale = "fit"
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            PhotoDisplay(
+                                asset = displaySecond,
+                                durationMs = 45_000,
+                                kenBurnsEnabled = kenBurnsEnabled,
+                                kenBurnsZoom = kenBurnsZoom,
+                                backgroundBlur = false,
+                                imageScale = "fit"
+                            )
+                        }
+                    }
+                } else {
+                    PhotoDisplay(
+                        asset = displayAsset,
+                        durationMs = 45_000,
+                        kenBurnsEnabled = kenBurnsEnabled,
+                        kenBurnsZoom = kenBurnsZoom,
+                        backgroundBlur = backgroundBlur,
+                        imageScale = imageScale
+                    )
+                }
             }
 
             // Metadata overlay
