@@ -163,7 +163,7 @@ fun SlideshowScreen(
                 // Guards rotation-mid-display: a stale pair is dropped to solo until next advance.
                 val photoIsPortrait = displayAsset.width != null && displayAsset.height != null &&
                     displayAsset.height > displayAsset.width
-                val showPair = displaySecond != null && (photoIsPortrait != isLandscapeDevice)
+                val showPair = displaySecond != null && (photoIsPortrait == isLandscapeDevice)
 
                 @Composable
                 fun cell(a: CachedAsset, blur: Boolean, scale: String) {
