@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,12 +66,18 @@ fun NowPlayingPill(
                 .background(pillBg),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left zone: album art + text (tappable — opens music mode)
+            // Left zone: album art + text
+            // Tap = open music mode, Long-press = stop music
             Row(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clickable(onClick = onClick)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onClick() },
+                            onLongPress = { musicPlayer.clearQueue() }
+                        )
+                    }
                     .padding(start = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -112,7 +120,7 @@ fun NowPlayingPill(
                     .background(dividerColor)
             )
 
-            // Play/pause — full vertical slice
+            // Play/pause
             Box(
                 modifier = Modifier
                     .width(56.dp)
@@ -138,7 +146,7 @@ fun NowPlayingPill(
                     .background(dividerColor)
             )
 
-            // Skip next — full vertical slice
+            // Skip next
             Box(
                 modifier = Modifier
                     .width(56.dp)
