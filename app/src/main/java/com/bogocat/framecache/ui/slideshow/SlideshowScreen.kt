@@ -1,6 +1,7 @@
 package com.bogocat.framecache.ui.slideshow
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -253,10 +255,19 @@ fun SlideshowScreen(
             )
         }
 
-        // Touch zones: left=prev, right=next, long-press=settings, swipe-down=settings
+        // Touch zones: left=prev, right=next, long-press=settings, swipe-down=settings, swipe-up=remove
         var dragTotalY by remember { mutableStateOf(0f) }
+        var showRemoveConfirm by remember { mutableStateOf(false) }
         var tapX by remember { mutableStateOf(0f) }
         var boxWidth by remember { mutableStateOf(1f) }
+
+        if (showRemoveConfirm) {
+            LaunchedEffect(Unit) {
+                delay(5_000)
+                showRemoveConfirm = false
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -266,6 +277,7 @@ fun SlideshowScreen(
                         onDragStart = { dragTotalY = 0f },
                         onDragEnd = {
                             if (dragTotalY > 100f) onOpenSettings()
+                            if (dragTotalY < -100f) showRemoveConfirm = true
                             dragTotalY = 0f
                         },
                         onVerticalDrag = { _, dragAmount -> dragTotalY += dragAmount }
@@ -284,6 +296,50 @@ fun SlideshowScreen(
                     )
                 }
         )
+
+        AnimatedVisibility(
+            visible = showRemoveConfirm,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xBB000000))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Remove this photo?",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+                Text(
+                    "Keep",
+                    color = Color(0x99FFFFFF),
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { showRemoveConfirm = false }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                Text(
+                    "Remove",
+                    color = Color(0xFFFF6B6B),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            showRemoveConfirm = false
+                            viewModel.removePhoto()
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
 
         // Now playing pill — ABOVE touch zone so controls receive taps
         val musicActive = nowPlaying.song.id.isNotEmpty() &&

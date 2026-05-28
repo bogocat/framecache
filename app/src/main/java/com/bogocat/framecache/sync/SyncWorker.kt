@@ -136,6 +136,7 @@ class SyncWorker @AssistedInject constructor(
                 // Keep all existing Immich assets (don't prune what we can't verify)
                 allKeepIds.addAll(assetDao.getUncachedAssets(10000).map { it.id })
                 allKeepIds.addAll(cacheManager.getAllCachedIds())
+                allKeepIds.addAll(assetDao.getRemovedIds())
             }
             if (localEnabled && localSyncSucceeded) {
                 allKeepIds.addAll(confirmedLocalIds)

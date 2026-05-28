@@ -1,7 +1,10 @@
 package com.bogocat.framecache.ui.slideshow
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bogocat.framecache.api.ImmichApi
+import com.bogocat.framecache.api.model.BulkIdsDto
 import com.bogocat.framecache.data.db.AssetDao
 import com.bogocat.framecache.data.db.CachedAsset
 import com.bogocat.framecache.data.settings.SettingsRepository
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class SlideshowState(
@@ -30,6 +34,7 @@ data class SlideshowState(
 class SlideshowViewModel @Inject constructor(
     private val assetDao: AssetDao,
     private val settings: SettingsRepository,
+    private val api: ImmichApi,
     val musicPlayer: MusicPlayer
 ) : ViewModel() {
 
@@ -203,6 +208,38 @@ class SlideshowViewModel @Inject constructor(
             cachedCount = assetDao.getCachedCount(),
             progress = 0f
         )
+    }
+
+    fun removePhoto() {
+        viewModelScope.launch {
+            val current = _state.value.currentAsset ?: return@launch
+            val assetId = current.id
+
+            advanceGeneration++
+            advance()
+
+            val filePath = current.filePath
+            if (filePath != null && !filePath.startsWith("content://")) {
+                File(filePath).delete()
+            }
+            assetDao.markRemoved(assetId)
+
+            val albumIds = settings.albumIds.first()
+            for (albumId in albumIds) {
+                try {
+                    api.removeAssetFromAlbum(albumId, BulkIdsDto(listOf(assetId)))
+                } catch (e: Exception) {
+                    Log.w("SlideshowViewModel", "Failed to remove $assetId from album $albumId: ${e.message}")
+                }
+            }
+
+            _state.value = _state.value.copy(cachedCount = assetDao.getCachedCount())
+
+            history.removeAll { it.id == assetId }
+            if (historyIndex >= history.size && historyIndex > 0) {
+                historyIndex--
+            }
+        }
     }
 
     fun togglePause() {

@@ -21,5 +21,6 @@ data class CachedAsset(
     val lastDisplayed: Long? = null,
     val filePath: String? = null,
     val width: Int? = null,
-    val height: Int? = null
+    val height: Int? = null,
+    val removedAt: Long? = null
 )

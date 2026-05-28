@@ -8,32 +8,35 @@ import androidx.room.Query
 @Dao
 interface AssetDao {
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND removedAt IS NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextRandom(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND removedAt IS NULL AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
     suspend fun getNextChronological(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND removedAt IS NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextFavorite(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND removedAt IS NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextLandscape(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND removedAt IS NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextPortrait(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND removedAt IS NULL AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextLandscapeNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND removedAt IS NULL AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextPortraitNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
 
     @Query("UPDATE cached_assets SET displayCount = displayCount + 1, lastDisplayed = :now WHERE id = :id")
     suspend fun markDisplayed(id: String, now: Long = System.currentTimeMillis())
 
-    @Query("SELECT COUNT(*) FROM cached_assets WHERE filePath IS NOT NULL")
+    @Query("SELECT COUNT(*) FROM cached_assets WHERE filePath IS NOT NULL AND removedAt IS NULL")
     suspend fun getCachedCount(): Int
+
+    @Query("UPDATE cached_assets SET removedAt = :now WHERE id = :id")
+    suspend fun markRemoved(id: String, now: Long = System.currentTimeMillis())
 
     @Query("SELECT COUNT(*) FROM cached_assets")
     suspend fun getTotalCount(): Int
@@ -44,7 +47,7 @@ interface AssetDao {
     @Query("DELETE FROM cached_assets WHERE id NOT IN (:keepIds)")
     suspend fun pruneRemoved(keepIds: List<String>)
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NULL ORDER BY RANDOM() LIMIT :limit")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NULL AND removedAt IS NULL ORDER BY RANDOM() LIMIT :limit")
     suspend fun getUncachedAssets(limit: Int): List<CachedAsset>
 
     @Query("UPDATE cached_assets SET filePath = :path WHERE id = :id")
@@ -58,4 +61,7 @@ interface AssetDao {
 
     @Query("DELETE FROM cached_assets WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("SELECT id FROM cached_assets WHERE removedAt IS NOT NULL")
+    suspend fun getRemovedIds(): List<String>
 }
