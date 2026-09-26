@@ -21,9 +21,9 @@ class ImageCacheManager @Inject constructor(
 
     fun isAssetCached(assetId: String): Boolean = getImageFile(assetId).exists()
 
-    suspend fun downloadAndCache(assetId: String): String? {
+    suspend fun downloadAndCache(assetId: String, isEdited: Boolean = false): String? {
         return try {
-            val response = api.getThumbnail(assetId, "preview")
+            val response = api.getThumbnail(assetId, "preview", edited = isEdited)
             val file = getImageFile(assetId)
             response.byteStream().use { input ->
                 file.outputStream().use { output ->

@@ -84,6 +84,27 @@ class SyncWorker @AssistedInject constructor(
                     Log.w(TAG, "All Immich album fetches failed — keeping existing cache (network may be down)")
                 }
 
+                // Detect assets edited on the server since they were cached, and
+                // invalidate them so they re-download with the current (edited) file.
+                if (immichSyncSucceeded) {
+                    val dtoById = allAssets.associateBy { it.id }
+                    var invalidated = 0
+                    for (existing in assetDao.getAllAssets()) {
+                        val dto = dtoById[existing.id] ?: continue
+                        val changed = (existing.updatedAt != null && existing.updatedAt != dto.updatedAt) ||
+                            existing.isEdited != dto.isEdited
+                        if (changed && existing.filePath != null) {
+                            cacheManager.getImageFile(existing.id).delete()
+                            assetDao.invalidateEditedAsset(existing.id, dto.isEdited, dto.updatedAt)
+                            invalidated++
+                        } else {
+                            // Refresh edit metadata (also backfills updatedAt on first run after upgrade)
+                            assetDao.updateEditMeta(existing.id, dto.isEdited, dto.updatedAt)
+                        }
+                    }
+                    if (invalidated > 0) Log.i(TAG, "Invalidated $invalidated edited asset(s) for re-download")
+                }
+
                 // Re-link existing files on disk
                 val uncached = assetDao.getUncachedAssets(1000)
                 var relinked = 0
@@ -103,7 +124,7 @@ class SyncWorker @AssistedInject constructor(
                 if (batch.isNotEmpty()) {
                     Log.i(TAG, "Downloading ${batch.size} uncached images")
                     for (asset in batch) {
-                        cacheManager.downloadAndCache(asset.id)
+                        cacheManager.downloadAndCache(asset.id, asset.isEdited)
                     }
                 }
             }
@@ -208,7 +229,9 @@ class SyncWorker @AssistedInject constructor(
             rating = exifInfo?.rating,
             isFavorite = isFavorite,
             width = width ?: exifInfo?.exifImageWidth,
-            height = height ?: exifInfo?.exifImageHeight
+            height = height ?: exifInfo?.exifImageHeight,
+            isEdited = isEdited,
+            updatedAt = updatedAt
         )
     }
 

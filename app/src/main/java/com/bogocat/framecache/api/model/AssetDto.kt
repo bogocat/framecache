@@ -11,7 +11,9 @@ data class AssetDto(
     val exifInfo: ExifInfoDto? = null,
     val people: List<PersonDto>? = null,
     val width: Int? = null,
-    val height: Int? = null
+    val height: Int? = null,
+    val isEdited: Boolean = false,
+    val updatedAt: String? = null
 )
 
 data class ExifInfoDto(

@@ -47,6 +47,15 @@ interface AssetDao {
     @Query("SELECT * FROM cached_assets WHERE filePath IS NULL ORDER BY RANDOM() LIMIT :limit")
     suspend fun getUncachedAssets(limit: Int): List<CachedAsset>
 
+    @Query("SELECT * FROM cached_assets")
+    suspend fun getAllAssets(): List<CachedAsset>
+
+    @Query("UPDATE cached_assets SET isEdited = :isEdited, updatedAt = :updatedAt, filePath = NULL WHERE id = :id")
+    suspend fun invalidateEditedAsset(id: String, isEdited: Boolean, updatedAt: String?)
+
+    @Query("UPDATE cached_assets SET isEdited = :isEdited, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateEditMeta(id: String, isEdited: Boolean, updatedAt: String?)
+
     @Query("UPDATE cached_assets SET filePath = :path WHERE id = :id")
     suspend fun updateFilePath(id: String, path: String)
 

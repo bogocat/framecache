@@ -21,6 +21,7 @@ interface ImmichApi {
     @GET("api/assets/{id}/thumbnail")
     suspend fun getThumbnail(
         @Path("id") assetId: String,
-        @Query("size") size: String = "preview"
+        @Query("size") size: String = "preview",
+        @Query("edited") edited: Boolean = false
     ): ResponseBody
 }
