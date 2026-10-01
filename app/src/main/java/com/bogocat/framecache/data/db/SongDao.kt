@@ -111,6 +111,10 @@ interface SongDao {
     @Query("SELECT DISTINCT albumId, album, artist, coverArt, year FROM cached_songs ORDER BY artist ASC, album ASC")
     suspend fun getAllAlbums(): List<AlbumSummary>
 
+    // Per-album cached song counts, used to skip re-fetching unchanged albums.
+    @Query("SELECT albumId, COUNT(*) AS count FROM cached_songs WHERE albumId != '' GROUP BY albumId")
+    suspend fun getSongCountsByAlbum(): List<AlbumSongCount>
+
     @Query("SELECT * FROM cached_songs WHERE albumId = :albumId ORDER BY track ASC, title ASC")
     suspend fun getSongsByAlbum(albumId: String): List<CachedSong>
 
@@ -158,4 +162,9 @@ data class AlbumSummary(
     val artist: String,
     val coverArt: String?,
     val year: Int?
+)
+
+data class AlbumSongCount(
+    val albumId: String,
+    val count: Int
 )

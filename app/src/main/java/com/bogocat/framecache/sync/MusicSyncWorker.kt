@@ -70,13 +70,17 @@ class MusicSyncWorker @AssistedInject constructor(
     }
 
     /**
-     * Sync full library metadata via paginated getAlbumList2 + getAlbum per album.
-     * Preserves existing file paths and play counts.
+     * Index the library. Albums whose cached song count already matches the server are
+     * skipped, so repeat runs are cheap and a cancelled/restarted run resumes instead
+     * of re-fetching every album from scratch.
      */
     private suspend fun syncLibrary() {
-        Log.i(TAG, "Starting full library sync...")
+        Log.i(TAG, "Starting library sync...")
+        val cachedCounts = songDao.getSongCountsByAlbum().associate { it.albumId to it.count }
         var offset = 0
-        var totalAlbums = 0
+        var seenAlbums = 0
+        var fetchedAlbums = 0
+        var skippedAlbums = 0
         var totalSongs = 0
 
         while (true) {
@@ -87,12 +91,16 @@ class MusicSyncWorker @AssistedInject constructor(
             )
             if (albums.isEmpty()) break
 
-            totalAlbums += albums.size
-            Log.d(TAG, "Fetched ${albums.size} albums (offset=$offset, total=$totalAlbums)")
+            seenAlbums += albums.size
+            Log.d(TAG, "Fetched ${albums.size} albums (offset=$offset, total=$seenAlbums)")
 
             for (album in albums) {
+                if (cachedCounts[album.id] == album.songCount && album.songCount > 0) {
+                    skippedAlbums++
+                    continue
+                }
                 try {
-                    val (albumDetail, songs) = navidromeClient.getAlbum(album.id)
+                    val (_, songs) = navidromeClient.getAlbum(album.id)
                     val cachedSongs = songs.map { song ->
                         song.toCachedSong(songDao.getById(song.id))
                     }
@@ -100,6 +108,7 @@ class MusicSyncWorker @AssistedInject constructor(
                         songDao.insertSongs(cachedSongs)
                         totalSongs += cachedSongs.size
                     }
+                    fetchedAlbums++
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to fetch album ${album.name}: ${e.message}")
                 }
@@ -109,7 +118,7 @@ class MusicSyncWorker @AssistedInject constructor(
             offset += ALBUM_PAGE_SIZE
         }
 
-        Log.i(TAG, "Library sync: $totalAlbums albums, $totalSongs songs")
+        Log.i(TAG, "Library sync: $seenAlbums albums ($fetchedAlbums fetched, $skippedAlbums skipped), $totalSongs songs upserted")
     }
 
     /**

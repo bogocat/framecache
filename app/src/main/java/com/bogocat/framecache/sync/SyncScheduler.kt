@@ -80,7 +80,9 @@ object SyncScheduler {
 
         val wm = WorkManager.getInstance(context)
         wm.enqueueUniqueWork(INITIAL_WORK_NAME, ExistingWorkPolicy.REPLACE, imageWork)
-        wm.enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.REPLACE, musicWork)
+        // KEEP so an in-flight (and slow) music sync isn't cancelled and restarted from
+        // scratch by a re-trigger; the running pass will finish instead.
+        wm.enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.KEEP, musicWork)
     }
 
     fun triggerMusicSync(context: Context) {
@@ -88,7 +90,7 @@ object SyncScheduler {
             .setConstraints(anyNetworkConstraints)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.REPLACE, work)
+            .enqueueUniqueWork(MUSIC_IMMEDIATE_WORK_NAME, ExistingWorkPolicy.KEEP, work)
     }
 
     fun cancelAll(context: Context) {
