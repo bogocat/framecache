@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -49,6 +50,23 @@ class SlideshowViewModel @Inject constructor(
     val showPersonAge = settings.showPersonAge.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val clockFormat = settings.clockFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "12")
 
+    // Overlay presentation
+    val overlayTextSize = settings.overlayTextSize.stateIn(viewModelScope, SharingStarted.Eagerly, "medium")
+    val overlayTextColor = settings.overlayTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, "light")
+    val overlayBackground = settings.overlayBackground.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val overlayBackgroundOpacity = settings.overlayBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
+    val overlayClockPosition = settings.overlayClockPosition.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_POS_TOP_START)
+    val overlayInfoPosition = settings.overlayInfoPosition.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_POS_BOTTOM_START)
+    val overlayCornerRadius = settings.overlayCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+    val overlayAnimation = settings.overlayAnimation.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_ANIM_STATIC)
+    val overlayMarquee = settings.overlayMarquee.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val overlayExpandScale = settings.overlayExpandScale.stateIn(viewModelScope, SharingStarted.Eagerly, 130)
+    val overlayCollapsedSeconds = settings.overlayCollapsedSeconds.stateIn(viewModelScope, SharingStarted.Eagerly, 6)
+    val overlayExpandedSeconds = settings.overlayExpandedSeconds.stateIn(viewModelScope, SharingStarted.Eagerly, 6)
+    val overlayExpandedIndefinite = settings.overlayExpandedIndefinite.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val overlayCollapsedIndefinite = settings.overlayCollapsedIndefinite.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val overlayCollapsedFields = settings.overlayCollapsedFields.stateIn(viewModelScope, SharingStarted.Eagerly, setOf(SettingsRepository.OVERLAY_FIELD_DATE))
+
     // Slideshow settings
     val crossfadeDuration = settings.crossfadeDuration.stateIn(viewModelScope, SharingStarted.Eagerly, 1500)
     val kenBurnsEnabled = settings.kenBurnsEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -80,11 +98,28 @@ class SlideshowViewModel @Inject constructor(
     @Volatile private var isDeviceLandscape: Boolean = true
 
     fun setDeviceLandscape(landscape: Boolean) {
+        val changed = isDeviceLandscape != landscape
         isDeviceLandscape = landscape
+        // Re-pick under the new orientation so "match"/"match + pairs" apply
+        // immediately after a rotation instead of waiting out the current photo.
+        if (changed && _state.value.currentAsset != null) {
+            viewModelScope.launch {
+                advanceGeneration++
+                advance()
+            }
+        }
     }
 
     init {
         startSlideshow()
+        // Apply a changed orientation policy without waiting for the current
+        // (possibly very long) duration to elapse.
+        viewModelScope.launch {
+            settings.orientationMode.drop(1).collect {
+                advanceGeneration++
+                advance()
+            }
+        }
     }
 
     fun startSlideshow() {
@@ -141,14 +176,31 @@ class SlideshowViewModel @Inject constructor(
     private suspend fun getNextFiltered(): CachedAsset? {
         val order = settings.photoOrder.first()
         val favOnly = settings.favoritesOnly.first()
+        val orientationMode = settings.orientationMode.first()
         val currentId = _state.value.currentAsset?.id ?: ""
 
+        // In "match" mode the primary pick is restricted to the screen's own
+        // orientation. Other modes draw from every orientation.
+        val matchOnly = orientationMode == SettingsRepository.ORIENTATION_MATCH
+
         val filtered = when {
-            favOnly -> assetDao.getNextFavorite(currentId)
-            order == "chronological" -> assetDao.getNextChronological(currentId)
+            favOnly -> when {
+                matchOnly && isDeviceLandscape -> assetDao.getNextFavoriteLandscape(currentId)
+                matchOnly -> assetDao.getNextFavoritePortrait(currentId)
+                else -> assetDao.getNextFavorite(currentId)
+            }
+            order == "chronological" -> when {
+                matchOnly && isDeviceLandscape -> assetDao.getNextChronologicalLandscape(currentId)
+                matchOnly -> assetDao.getNextChronologicalPortrait(currentId)
+                else -> assetDao.getNextChronological(currentId)
+            }
+            matchOnly && isDeviceLandscape -> assetDao.getNextLandscape(currentId)
+            matchOnly -> assetDao.getNextPortrait(currentId)
             else -> null
         }
 
+        // Fall back to any orientation so the frame never goes blank (e.g. the
+        // orientation filter matches nothing yet).
         return filtered
             ?: assetDao.getNextRandom(currentId)
             ?: assetDao.getNextRandom("")
@@ -158,6 +210,10 @@ class SlideshowViewModel @Inject constructor(
     // so two portraits fill a landscape frame, two landscapes stack on a portrait frame.
     // Prefer a partner from the same time period: 7d → 30d → 365d → any.
     private suspend fun pairPartnerFor(asset: CachedAsset): CachedAsset? {
+        // Only "match + pairs" pairs opposite-orientation photos; "match" shows
+        // only same-orientation and "all" shows everything one at a time.
+        if (settings.orientationMode.first() != SettingsRepository.ORIENTATION_MATCH_PAIR) return null
+
         val w = asset.width ?: return null
         val h = asset.height ?: return null
         val isPhotoPortrait = h > w

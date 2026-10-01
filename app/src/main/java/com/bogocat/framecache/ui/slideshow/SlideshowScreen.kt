@@ -44,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import coil3.compose.AsyncImage
 import com.bogocat.framecache.data.db.CachedAsset
+import com.bogocat.framecache.data.settings.SettingsRepository
 import com.bogocat.framecache.music.NowPlaying
 import kotlinx.coroutines.delay
 import java.io.File
@@ -75,6 +76,21 @@ fun SlideshowScreen(
     val showRating by viewModel.showRating.collectAsState()
     val showPersonAge by viewModel.showPersonAge.collectAsState()
     val clockFormat by viewModel.clockFormat.collectAsState()
+    val overlayTextSize by viewModel.overlayTextSize.collectAsState()
+    val overlayTextColor by viewModel.overlayTextColor.collectAsState()
+    val overlayBackground by viewModel.overlayBackground.collectAsState()
+    val overlayBackgroundOpacity by viewModel.overlayBackgroundOpacity.collectAsState()
+    val overlayClockPosition by viewModel.overlayClockPosition.collectAsState()
+    val overlayInfoPosition by viewModel.overlayInfoPosition.collectAsState()
+    val overlayCornerRadius by viewModel.overlayCornerRadius.collectAsState()
+    val overlayAnimationMode by viewModel.overlayAnimation.collectAsState()
+    val overlayMarquee by viewModel.overlayMarquee.collectAsState()
+    val overlayExpandScale by viewModel.overlayExpandScale.collectAsState()
+    val overlayCollapsedSeconds by viewModel.overlayCollapsedSeconds.collectAsState()
+    val overlayExpandedSeconds by viewModel.overlayExpandedSeconds.collectAsState()
+    val overlayExpandedIndefinite by viewModel.overlayExpandedIndefinite.collectAsState()
+    val overlayCollapsedIndefinite by viewModel.overlayCollapsedIndefinite.collectAsState()
+    val overlayCollapsedFields by viewModel.overlayCollapsedFields.collectAsState()
     val sleepEnabled by viewModel.sleepEnabled.collectAsState()
     val sleepStartHour by viewModel.sleepStartHour.collectAsState()
     val sleepEndHour by viewModel.sleepEndHour.collectAsState()
@@ -83,6 +99,31 @@ fun SlideshowScreen(
     // Reactive device orientation — re-composes on rotation.
     val isLandscapeDevice = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscapeDevice) { viewModel.setDeviceLandscape(isLandscapeDevice) }
+
+    // Overlay presentation, assembled from the user's style options.
+    val overlayStyle = OverlayStyle(
+        scale = when (overlayTextSize) {
+            "small" -> 0.85f
+            "large" -> 1.3f
+            else -> 1f
+        },
+        light = overlayTextColor != "dark",
+        showBackground = overlayBackground,
+        backgroundOpacity = overlayBackgroundOpacity / 100f,
+        cornerRadius = overlayCornerRadius
+    )
+    val clockAlignment = remember(overlayClockPosition) { overlayAlignment(overlayClockPosition) }
+    val infoAlignment = remember(overlayInfoPosition) { overlayAlignment(overlayInfoPosition) }
+    val overlayAnimation = OverlayAnimation(
+        mode = overlayAnimationMode,
+        scale = overlayExpandScale / 100f,
+        collapsedSeconds = overlayCollapsedSeconds,
+        expandedSeconds = overlayExpandedSeconds,
+        expandedIndefinite = overlayExpandedIndefinite,
+        collapsedIndefinite = overlayCollapsedIndefinite,
+        marquee = overlayMarquee,
+        collapsedFields = overlayCollapsedFields
+    )
 
     // Check if in sleep hours
     var isSleeping by remember { mutableStateOf(false) }
@@ -177,7 +218,7 @@ fun SlideshowScreen(
                     )
                     PhotoInfoPill(
                         asset = a,
-                        alignment = Alignment.BottomStart,
+                        alignment = infoAlignment,
                         showPhotoDate = showPhotoDate,
                         showLocation = showLocation,
                         showDescription = showDescription,
@@ -185,7 +226,9 @@ fun SlideshowScreen(
                         showCamera = showCamera,
                         showRating = showRating,
                         showPersonAge = showPersonAge,
-                        dateFormat = dateFormat
+                        dateFormat = dateFormat,
+                        style = overlayStyle,
+                        animation = overlayAnimation
                     )
                 }
 
@@ -213,7 +256,9 @@ fun SlideshowScreen(
                 showClock = showClock,
                 showDate = showDate,
                 clockFormat = clockFormat,
-                dateFormat = dateFormat
+                dateFormat = dateFormat,
+                alignment = clockAlignment,
+                style = overlayStyle
             )
 
             // Progress bar
