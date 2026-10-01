@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface AssetDao {
@@ -16,6 +17,18 @@ interface AssetDao {
 
     @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextFavorite(excludeId: String = ""): CachedAsset?
+
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextFavoriteLandscape(excludeId: String = ""): CachedAsset?
+
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    suspend fun getNextFavoritePortrait(excludeId: String = ""): CachedAsset?
+
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    suspend fun getNextChronologicalLandscape(excludeId: String = ""): CachedAsset?
+
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    suspend fun getNextChronologicalPortrait(excludeId: String = ""): CachedAsset?
 
     @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
     suspend fun getNextLandscape(excludeId: String = ""): CachedAsset?
@@ -41,6 +54,11 @@ interface AssetDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(assets: List<CachedAsset>)
 
+    // Full-row upsert used to refresh server-derived metadata on already-cached
+    // assets without clobbering local-only columns (see SyncWorker).
+    @Update
+    suspend fun update(asset: CachedAsset)
+
     @Query("DELETE FROM cached_assets WHERE id NOT IN (:keepIds)")
     suspend fun pruneRemoved(keepIds: List<String>)
 
@@ -49,12 +67,6 @@ interface AssetDao {
 
     @Query("SELECT * FROM cached_assets")
     suspend fun getAllAssets(): List<CachedAsset>
-
-    @Query("UPDATE cached_assets SET isEdited = :isEdited, updatedAt = :updatedAt, filePath = NULL WHERE id = :id")
-    suspend fun invalidateEditedAsset(id: String, isEdited: Boolean, updatedAt: String?)
-
-    @Query("UPDATE cached_assets SET isEdited = :isEdited, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun updateEditMeta(id: String, isEdited: Boolean, updatedAt: String?)
 
     @Query("UPDATE cached_assets SET filePath = :path WHERE id = :id")
     suspend fun updateFilePath(id: String, path: String)

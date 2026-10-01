@@ -84,23 +84,32 @@ class SyncWorker @AssistedInject constructor(
                     Log.w(TAG, "All Immich album fetches failed — keeping existing cache (network may be down)")
                 }
 
-                // Detect assets edited on the server since they were cached, and
-                // invalidate them so they re-download with the current (edited) file.
+                // Refresh metadata for every cached asset and re-download any whose
+                // pixels changed on the server (edit state / updatedAt moved).
                 if (immichSyncSucceeded) {
                     val dtoById = allAssets.associateBy { it.id }
                     var invalidated = 0
                     for (existing in assetDao.getAllAssets()) {
                         val dto = dtoById[existing.id] ?: continue
-                        val changed = (existing.updatedAt != null && existing.updatedAt != dto.updatedAt) ||
+
+                        val fileChanged = (existing.updatedAt != null && existing.updatedAt != dto.updatedAt) ||
                             existing.isEdited != dto.isEdited
-                        if (changed && existing.filePath != null) {
+                        if (fileChanged && existing.filePath != null) {
                             cacheManager.getImageFile(existing.id).delete()
-                            assetDao.invalidateEditedAsset(existing.id, dto.isEdited, dto.updatedAt)
                             invalidated++
-                        } else {
-                            // Refresh edit metadata (also backfills updatedAt on first run after upgrade)
-                            assetDao.updateEditMeta(existing.id, dto.isEdited, dto.updatedAt)
                         }
+
+                        // Upsert all server-derived columns while keeping local-only
+                        // state (cache path, timestamps, display counts) intact.
+                        val fresh = dto.toCachedAsset(existing.albumId)
+                        assetDao.update(
+                            fresh.copy(
+                                cachedAt = existing.cachedAt,
+                                displayCount = existing.displayCount,
+                                lastDisplayed = existing.lastDisplayed,
+                                filePath = if (fileChanged) null else existing.filePath
+                            )
+                        )
                     }
                     if (invalidated > 0) Log.i(TAG, "Invalidated $invalidated edited asset(s) for re-download")
                 }
@@ -171,7 +180,7 @@ class SyncWorker @AssistedInject constructor(
                 assetDao.pruneRemoved(allKeepIds.toList())
             }
 
-            cacheManager.evictIfNeeded()
+            cacheManager.evictIfNeeded(settings.maxCachedImages.first())
 
             val count = assetDao.getCachedCount()
             Log.i(TAG, "Sync complete. $count images cached")

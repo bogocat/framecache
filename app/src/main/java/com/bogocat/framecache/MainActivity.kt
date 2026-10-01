@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import com.bogocat.framecache.api.navidrome.NavidromeClient
 import com.bogocat.framecache.data.cache.ImageCacheManager
 import com.bogocat.framecache.data.db.SongDao
@@ -25,6 +26,7 @@ import com.bogocat.framecache.ui.setup.SetupScreen
 import com.bogocat.framecache.ui.slideshow.SlideshowScreen
 import com.bogocat.framecache.ui.theme.FrameCacheTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
@@ -51,7 +53,9 @@ class MainActivity : ComponentActivity() {
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-        SyncScheduler.schedulePeriodicSync(this)
+        lifecycleScope.launch {
+            SyncScheduler.applySyncInterval(this@MainActivity, settings)
+        }
         SyncScheduler.triggerImmediateSync(this)
 
         setContent {
