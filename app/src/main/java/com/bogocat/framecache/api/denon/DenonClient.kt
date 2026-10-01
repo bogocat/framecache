@@ -104,6 +104,44 @@ class DenonClient @Inject constructor(
             .find(body)?.groupValues?.get(1) ?: "UNKNOWN"
     }
 
+    /** Playback position/duration reported by the receiver. */
+    data class PositionInfo(val positionMs: Long, val durationMs: Long)
+
+    suspend fun getPositionInfo(): PositionInfo? {
+        val body = soap(
+            host(),
+            "GetPositionInfo",
+            "<u:GetPositionInfo xmlns:u=\"$AVT_SERVICE\"><InstanceID>0</InstanceID></u:GetPositionInfo>"
+        ) ?: return null
+        val rel = Regex("<RelTime>\\s*([^<]*?)\\s*</RelTime>").find(body)?.groupValues?.get(1)
+        val dur = Regex("<TrackDuration>\\s*([^<]*?)\\s*</TrackDuration>").find(body)?.groupValues?.get(1)
+        return PositionInfo(parseTimeToMs(rel), parseTimeToMs(dur))
+    }
+
+    /** Seek within the current track. */
+    suspend fun seek(positionMs: Long): Boolean {
+        val total = (positionMs / 1000).coerceAtLeast(0)
+        val target = "%d:%02d:%02d".format(total / 3600, (total % 3600) / 60, total % 60)
+        return soap(
+            host(),
+            "Seek",
+            "<u:Seek xmlns:u=\"$AVT_SERVICE\"><InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>$target</Target></u:Seek>"
+        ) != null
+    }
+
+    private fun parseTimeToMs(value: String?): Long {
+        if (value.isNullOrBlank()) return 0L
+        val parts = value.split(":")
+        return try {
+            val h = parts.getOrNull(0)?.toDoubleOrNull() ?: 0.0
+            val m = parts.getOrNull(1)?.toDoubleOrNull() ?: 0.0
+            val s = parts.getOrNull(2)?.toDoubleOrNull() ?: 0.0
+            ((h * 3600 + m * 60 + s) * 1000).toLong()
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
     suspend fun ping(): Boolean = getTransportState() != "UNKNOWN"
 
     // -- internals --

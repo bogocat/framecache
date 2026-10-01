@@ -2,6 +2,7 @@ package com.bogocat.framecache.music
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -69,6 +70,11 @@ class MusicPlayer @Inject constructor(
     private val _denonOutput = MutableStateFlow(false)
     val denonOutput: StateFlow<Boolean> = _denonOutput.asStateFlow()
     private var denonPollJob: Job? = null
+    // Denon position tracking (the receiver reports position on a ~5s poll; we
+    // interpolate locally so the progress bar moves smoothly in between).
+    private var denonPositionMs: Long = 0
+    private var denonPositionAt: Long = 0
+    private var denonDurationMs: Long = 0
 
     private var player: ExoPlayer? = null
 
@@ -187,6 +193,9 @@ class MusicPlayer @Inject constructor(
     private suspend fun playOnDenon(song: Song) {
         val url = navidromeClient.getStreamUrl(song.id)
         val ok = denonClient.playStream(url, song.title, song.artist, song.album)
+        denonPositionMs = 0
+        denonPositionAt = SystemClock.elapsedRealtime()
+        denonDurationMs = song.duration * 1000L
         val coverUrl = song.coverArt?.let { navidromeClient.getCoverArtUrl(it, 600) } ?: ""
         _nowPlaying.value = NowPlaying(
             song = song,
@@ -207,6 +216,17 @@ class MusicPlayer @Inject constructor(
                 delay(5000)
                 if (!_denonOutput.value) break
                 val state = denonClient.getTransportState()
+                if (state == "PLAYING") {
+                    denonClient.getPositionInfo()?.let { info ->
+                        denonPositionMs = info.positionMs
+                        if (info.durationMs > 0) denonDurationMs = info.durationMs
+                        denonPositionAt = SystemClock.elapsedRealtime()
+                    }
+                }
+                val playing = state == "PLAYING"
+                if (_nowPlaying.value.isPlaying != playing) {
+                    _nowPlaying.value = _nowPlaying.value.copy(isPlaying = playing)
+                }
                 if (state == "STOPPED" || state == "NO_MEDIA_PRESENT") {
                     autoAdvance()
                 }
@@ -325,6 +345,15 @@ class MusicPlayer @Inject constructor(
     }
 
     fun seekTo(positionMs: Long) {
+        if (_denonOutput.value) {
+            scope.launch {
+                if (denonClient.seek(positionMs)) {
+                    denonPositionMs = positionMs
+                    denonPositionAt = SystemClock.elapsedRealtime()
+                }
+            }
+            return
+        }
         player?.seekTo(positionMs)
     }
 
@@ -332,9 +361,21 @@ class MusicPlayer @Inject constructor(
         player?.volume = volume.coerceIn(0f, 1f)
     }
 
-    fun getPosition(): Long = player?.currentPosition ?: 0L
+    fun getPosition(): Long {
+        if (_denonOutput.value) {
+            if (!_nowPlaying.value.isPlaying) return denonPositionMs
+            val pos = denonPositionMs + (SystemClock.elapsedRealtime() - denonPositionAt)
+            return if (denonDurationMs > 0) pos.coerceIn(0L, denonDurationMs) else pos
+        }
+        return player?.currentPosition ?: 0L
+    }
 
-    fun getDuration(): Long = player?.duration?.takeIf { it > 0 } ?: _nowPlaying.value.duration
+    fun getDuration(): Long {
+        if (_denonOutput.value) {
+            return denonDurationMs.takeIf { it > 0 } ?: _nowPlaying.value.duration
+        }
+        return player?.duration?.takeIf { it > 0 } ?: _nowPlaying.value.duration
+    }
 
     fun isActive(): Boolean = (_denonOutput.value && _nowPlaying.value.isPlaying) ||
             player?.isPlaying == true ||

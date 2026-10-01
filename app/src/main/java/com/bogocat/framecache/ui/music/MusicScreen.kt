@@ -278,10 +278,21 @@ private fun NowPlayingTab(
                 if (queueSource.isNotEmpty()) Text(queueSource, color = Color(0x66FFFFFF), fontSize = 11.sp)
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Slider(value = progress, onValueChange = {
-                val dur = musicPlayer.getDuration(); if (dur > 0) musicPlayer.seekTo((it * dur).toLong())
-            }, modifier = Modifier.fillMaxWidth(0.85f), colors = SliderDefaults.colors(
-                thumbColor = Color.White, activeTrackColor = accentColor, inactiveTrackColor = Color(0x33FFFFFF)))
+            var seekTarget by remember { mutableFloatStateOf(0f) }
+            var seeking by remember { mutableStateOf(false) }
+            Slider(
+                value = if (seeking) seekTarget else progress,
+                onValueChange = { seeking = true; seekTarget = it },
+                onValueChangeFinished = {
+                    val dur = musicPlayer.getDuration()
+                    if (dur > 0) musicPlayer.seekTo((seekTarget * dur).toLong())
+                    seeking = false
+                },
+                modifier = Modifier.fillMaxWidth(0.85f),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White, activeTrackColor = accentColor, inactiveTrackColor = Color(0x33FFFFFF)
+                )
+            )
             Row(modifier = Modifier.fillMaxWidth(0.85f), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(formatTime(positionMs.toLong()), color = dimText, fontSize = 11.sp)
                 Text(formatTime(musicPlayer.getDuration()), color = dimText, fontSize = 11.sp)
