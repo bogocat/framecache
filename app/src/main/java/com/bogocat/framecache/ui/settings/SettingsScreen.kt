@@ -121,6 +121,7 @@ fun SettingsScreen(
     val overlayAnimation by settings.overlayAnimation.collectAsState(initial = SettingsRepository.OVERLAY_ANIM_STATIC)
     val overlayMarquee by settings.overlayMarquee.collectAsState(initial = false)
     val overlayExpandScale by settings.overlayExpandScale.collectAsState(initial = 130)
+    val overlayCollapsedScale by settings.overlayCollapsedScale.collectAsState(initial = 100)
     val overlayCollapsedSeconds by settings.overlayCollapsedSeconds.collectAsState(initial = 6)
     val overlayExpandedSeconds by settings.overlayExpandedSeconds.collectAsState(initial = 6)
     val overlayExpandedIndefinite by settings.overlayExpandedIndefinite.collectAsState(initial = false)
@@ -130,7 +131,8 @@ fun SettingsScreen(
     val npShowTitle by settings.npShowTitle.collectAsState(initial = true)
     val npShowArtist by settings.npShowArtist.collectAsState(initial = true)
     val npShowControls by settings.npShowControls.collectAsState(initial = true)
-    val npScale by settings.npScale.collectAsState(initial = 100)
+    val npExpandedScale by settings.npExpandedScale.collectAsState(initial = 100)
+    val npCollapsedScale by settings.npCollapsedScale.collectAsState(initial = 85)
     val npBackgroundOpacity by settings.npBackgroundOpacity.collectAsState(initial = 80)
     val npCornerRadius by settings.npCornerRadius.collectAsState(initial = 16)
     val npAnimation by settings.npAnimation.collectAsState(initial = SettingsRepository.OVERLAY_ANIM_STATIC)
@@ -659,8 +661,11 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
             )
 
-            SliderSetting("Expand Size", overlayExpandScale.toFloat(), 100f..200f, "%") {
+            SliderSetting("Expanded Size", overlayExpandScale.toFloat(), 50f..200f, "%") {
                 scope.launch { settings.save(SettingsRepository.OVERLAY_EXPAND_SCALE, it.roundToInt()) }
+            }
+            SliderSetting("Collapsed Size", overlayCollapsedScale.toFloat(), 50f..200f, "%") {
+                scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SCALE, it.roundToInt()) }
             }
 
             if (!overlayExpandedIndefinite) {
@@ -737,8 +742,11 @@ fun SettingsScreen(
             SettingsToggle("Artist", npShowArtist) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ARTIST, it) } }
             SettingsToggle("Play / Skip Controls", npShowControls) { scope.launch { settings.save(SettingsRepository.NP_SHOW_CONTROLS, it) } }
 
-            SliderSetting("Size", npScale.toFloat(), 75f..150f, "%") {
-                scope.launch { settings.save(SettingsRepository.NP_SCALE, it.roundToInt()) }
+            SliderSetting("Expanded Size", npExpandedScale.toFloat(), 50f..200f, "%") {
+                scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SCALE, it.roundToInt()) }
+            }
+            SliderSetting("Collapsed Size", npCollapsedScale.toFloat(), 50f..200f, "%") {
+                scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SCALE, it.roundToInt()) }
             }
             SliderSetting("Background Opacity", npBackgroundOpacity.toFloat(), 0f..100f, "%") {
                 scope.launch { settings.save(SettingsRepository.NP_BACKGROUND_OPACITY, it.roundToInt()) }

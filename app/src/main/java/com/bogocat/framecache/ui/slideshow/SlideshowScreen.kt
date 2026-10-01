@@ -88,6 +88,7 @@ fun SlideshowScreen(
     val overlayAnimationMode by viewModel.overlayAnimation.collectAsState()
     val overlayMarquee by viewModel.overlayMarquee.collectAsState()
     val overlayExpandScale by viewModel.overlayExpandScale.collectAsState()
+    val overlayCollapsedScale by viewModel.overlayCollapsedScale.collectAsState()
     val overlayCollapsedSeconds by viewModel.overlayCollapsedSeconds.collectAsState()
     val overlayExpandedSeconds by viewModel.overlayExpandedSeconds.collectAsState()
     val overlayExpandedIndefinite by viewModel.overlayExpandedIndefinite.collectAsState()
@@ -97,7 +98,8 @@ fun SlideshowScreen(
     val npShowTitle by viewModel.npShowTitle.collectAsState()
     val npShowArtist by viewModel.npShowArtist.collectAsState()
     val npShowControls by viewModel.npShowControls.collectAsState()
-    val npScale by viewModel.npScale.collectAsState()
+    val npExpandedScale by viewModel.npExpandedScale.collectAsState()
+    val npCollapsedScale by viewModel.npCollapsedScale.collectAsState()
     val npBackgroundOpacity by viewModel.npBackgroundOpacity.collectAsState()
     val npCornerRadius by viewModel.npCornerRadius.collectAsState()
     val npAnimation by viewModel.npAnimation.collectAsState()
@@ -129,7 +131,8 @@ fun SlideshowScreen(
     val infoAlignment = remember(overlayInfoPosition) { overlayAlignment(overlayInfoPosition) }
     val overlayAnimation = OverlayAnimation(
         mode = overlayAnimationMode,
-        scale = overlayExpandScale / 100f,
+        expandedScale = overlayExpandScale / 100f,
+        collapsedScale = overlayCollapsedScale / 100f,
         collapsedSeconds = overlayCollapsedSeconds,
         expandedSeconds = overlayExpandedSeconds,
         expandedIndefinite = overlayExpandedIndefinite,
@@ -142,7 +145,8 @@ fun SlideshowScreen(
         showTitle = npShowTitle,
         showArtist = npShowArtist,
         showControls = npShowControls,
-        scale = npScale / 100f,
+        expandedScale = npExpandedScale / 100f,
+        collapsedScale = npCollapsedScale / 100f,
         backgroundOpacity = npBackgroundOpacity / 100f,
         cornerRadius = npCornerRadius,
         animationEnabled = npAnimation != SettingsRepository.OVERLAY_ANIM_STATIC,

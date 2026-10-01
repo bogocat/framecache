@@ -81,7 +81,8 @@ data class OverlayStyle(
  */
 data class OverlayAnimation(
     val mode: String = SettingsRepository.OVERLAY_ANIM_STATIC,
-    val scale: Float = 1.3f,
+    val expandedScale: Float = 1.3f,
+    val collapsedScale: Float = 1.0f,
     val collapsedSeconds: Int = 6,
     val expandedSeconds: Int = 6,
     val expandedIndefinite: Boolean = false,
@@ -249,7 +250,7 @@ fun BoxScope.PhotoInfoPill(
         animationSpec = tween(durationMillis = 600),
         label = "overlayExpand"
     )
-    val effScale = style.scale * (1f + (animation.scale - 1f) * progress)
+    val effScale = style.scale * (animation.collapsedScale + (animation.expandedScale - animation.collapsedScale) * progress)
 
     // Lines the user pinned to survive the collapsed phase.
     val pinnedIds = lines.filter { it.id in animation.collapsedFields }.map { it.id }.toSet()

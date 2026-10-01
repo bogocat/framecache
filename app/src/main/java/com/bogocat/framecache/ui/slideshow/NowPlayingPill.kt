@@ -63,7 +63,8 @@ data class NowPlayingConfig(
     val showTitle: Boolean = true,
     val showArtist: Boolean = true,
     val showControls: Boolean = true,
-    val scale: Float = 1f,
+    val expandedScale: Float = 1f,
+    val collapsedScale: Float = 0.85f,
     val backgroundOpacity: Float = 0.80f,
     val cornerRadius: Int = 16,
     val animationEnabled: Boolean = false,
@@ -116,7 +117,7 @@ fun NowPlayingPill(
         label = "npCollapse"
     )
     val showFull = expanded
-    val scale = config.scale * (0.85f + 0.15f * progress)
+    val scale = config.collapsedScale + (config.expandedScale - config.collapsedScale) * progress
 
     fun show(element: String, enabled: Boolean) = enabled && (showFull || element in config.collapsedElements)
     val showArt = show(NP_ELEMENT_ART, config.showArt)
@@ -248,19 +249,21 @@ fun NowPlayingPill(
                 }
             }
 
-            // Close: stop playback and clear the queue.
-            Box(
-                modifier = Modifier
-                    .width((30 * scale).dp)
-                    .fillMaxHeight()
-                    .clickable { musicPlayer.clearQueue() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "\u2715",
-                    color = Color(0xAAFFFFFF),
-                    fontSize = (14 * scale).sp
-                )
+            // Close: stop playback and clear the queue (expanded view only).
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .width((30 * scale).dp)
+                        .fillMaxHeight()
+                        .clickable { musicPlayer.clearQueue() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "\u2715",
+                        color = Color(0xAAFFFFFF),
+                        fontSize = (14 * scale).sp
+                    )
+                }
             }
         }
     }

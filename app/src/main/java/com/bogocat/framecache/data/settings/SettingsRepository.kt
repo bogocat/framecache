@@ -70,6 +70,7 @@ class SettingsRepository @Inject constructor(
         val OVERLAY_ANIMATION = stringPreferencesKey("overlay_animation")
         val OVERLAY_MARQUEE = booleanPreferencesKey("overlay_marquee")
         val OVERLAY_EXPAND_SCALE = intPreferencesKey("overlay_expand_scale")
+        val OVERLAY_COLLAPSED_SCALE = intPreferencesKey("overlay_collapsed_scale")
         val OVERLAY_COLLAPSED_SECONDS = intPreferencesKey("overlay_collapsed_seconds")
         val OVERLAY_EXPANDED_SECONDS = intPreferencesKey("overlay_expanded_seconds")
         val OVERLAY_EXPANDED_INDEFINITE = booleanPreferencesKey("overlay_expanded_indefinite")
@@ -102,7 +103,10 @@ class SettingsRepository @Inject constructor(
         val NP_SHOW_TITLE = booleanPreferencesKey("np_show_title")
         val NP_SHOW_ARTIST = booleanPreferencesKey("np_show_artist")
         val NP_SHOW_CONTROLS = booleanPreferencesKey("np_show_controls")
-        val NP_SCALE = intPreferencesKey("np_scale")
+        val NP_EXPANDED_SCALE = intPreferencesKey("np_expanded_scale")
+        val NP_COLLAPSED_SCALE = intPreferencesKey("np_collapsed_scale")
+        // Legacy single-size key; used as a fallback so existing installs keep their size.
+        val NP_SCALE_LEGACY = intPreferencesKey("np_scale")
         val NP_BACKGROUND_OPACITY = intPreferencesKey("np_background_opacity")
         val NP_CORNER_RADIUS = intPreferencesKey("np_corner_radius")
         val NP_ANIMATION = stringPreferencesKey("np_animation")
@@ -188,6 +192,7 @@ class SettingsRepository @Inject constructor(
     }
     val overlayMarquee: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_MARQUEE] ?: false }
     val overlayExpandScale: Flow<Int> = context.dataStore.data.map { it[OVERLAY_EXPAND_SCALE] ?: 130 }
+    val overlayCollapsedScale: Flow<Int> = context.dataStore.data.map { it[OVERLAY_COLLAPSED_SCALE] ?: 100 }
     val overlayCollapsedSeconds: Flow<Int> = context.dataStore.data.map { it[OVERLAY_COLLAPSED_SECONDS] ?: 6 }
     val overlayExpandedSeconds: Flow<Int> = context.dataStore.data.map { it[OVERLAY_EXPANDED_SECONDS] ?: 6 }
     val overlayExpandedIndefinite: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_EXPANDED_INDEFINITE] ?: false }
@@ -206,7 +211,10 @@ class SettingsRepository @Inject constructor(
     val npShowTitle: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_TITLE] ?: true }
     val npShowArtist: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_ARTIST] ?: true }
     val npShowControls: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_CONTROLS] ?: true }
-    val npScale: Flow<Int> = context.dataStore.data.map { it[NP_SCALE] ?: 100 }
+    val npExpandedScale: Flow<Int> = context.dataStore.data.map { it[NP_EXPANDED_SCALE] ?: it[NP_SCALE_LEGACY] ?: 100 }
+    val npCollapsedScale: Flow<Int> = context.dataStore.data.map {
+        it[NP_COLLAPSED_SCALE] ?: (((it[NP_SCALE_LEGACY] ?: 100) * 85) / 100)
+    }
     val npBackgroundOpacity: Flow<Int> = context.dataStore.data.map { it[NP_BACKGROUND_OPACITY] ?: 80 }
     val npCornerRadius: Flow<Int> = context.dataStore.data.map { it[NP_CORNER_RADIUS] ?: 16 }
     val npAnimation: Flow<String> = context.dataStore.data.map { it[NP_ANIMATION] ?: OVERLAY_ANIM_STATIC }
