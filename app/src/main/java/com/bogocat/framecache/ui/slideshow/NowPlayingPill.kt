@@ -10,7 +10,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,8 +54,8 @@ const val NP_ELEMENT_CONTROLS = "controls"
 
 /**
  * Presentation config for the now-playing pill shown over the slideshow. Mirrors the
- * photo-info overlay: a set of always/expanded elements, a size scale, and an optional
- * expand->collapse cycle that keeps a configurable subset.
+ * photo-info overlay: a set of enabled elements, independent expanded/collapsed sizes,
+ * and an optional expand->collapse cycle that keeps a configurable subset.
  */
 data class NowPlayingConfig(
     val showArt: Boolean = true,
@@ -88,7 +87,7 @@ fun NowPlayingPill(
 
     // Expand -> collapse lifecycle (same shape as the photo overlay). Starts full.
     var autoExpanded by remember { mutableStateOf(true) }
-    // Manual override: double-tapping the pill flips size; null = follow the auto cycle.
+    // Manual override: tapping the pill flips size; null = follow the auto cycle.
     var manualOverride by remember(nowPlaying.song.id) { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(
         config.animationEnabled,
@@ -116,10 +115,9 @@ fun NowPlayingPill(
         animationSpec = tween(500),
         label = "npCollapse"
     )
-    val showFull = expanded
     val scale = config.collapsedScale + (config.expandedScale - config.collapsedScale) * progress
 
-    fun show(element: String, enabled: Boolean) = enabled && (showFull || element in config.collapsedElements)
+    fun show(element: String, enabled: Boolean) = enabled && (expanded || element in config.collapsedElements)
     val showArt = show(NP_ELEMENT_ART, config.showArt)
     val showTitle = show(NP_ELEMENT_TITLE, config.showTitle)
     val showArtist = show(NP_ELEMENT_ARTIST, config.showArtist)
@@ -133,7 +131,7 @@ fun NowPlayingPill(
     ) {
         Row(
             modifier = Modifier
-                .widthIn(max = 480.dp)
+                .widthIn(max = 560.dp)
                 .height((64 * scale).dp)
                 .clip(RoundedCornerShape(config.cornerRadius.dp))
                 .background(Color.Black.copy(alpha = config.backgroundOpacity))
@@ -147,57 +145,54 @@ fun NowPlayingPill(
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left zone: art + text (tap = open music, long-press = stop music).
-            if (showArt || showTitle || showArtist) {
-                Row(
-                    modifier = Modifier.padding(horizontal = (10 * scale).dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy((10 * scale).dp)
-                ) {
-                    if (showArt) {
-                        if (nowPlaying.coverArtUrl.isNotEmpty()) {
-                            AsyncImage(
-                                model = nowPlaying.coverArtUrl,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size((46 * scale).dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        } else {
-                            // Placeholder so the collapsed pill always has a tappable body.
-                            Box(
-                                modifier = Modifier
-                                    .size((46 * scale).dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0x22FFFFFF)),
-                                contentAlignment = Alignment.Center
-                            ) { Text("\u266A", color = Color(0x99FFFFFF), fontSize = (20 * scale).sp) }
-                        }
+            if (showArt) {
+                Box(modifier = Modifier.padding(start = (10 * scale).dp)) {
+                    if (nowPlaying.coverArtUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = nowPlaying.coverArtUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size((46 * scale).dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        // Placeholder so the collapsed pill always has a tappable body.
+                        Box(
+                            modifier = Modifier
+                                .size((46 * scale).dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x22FFFFFF)),
+                            contentAlignment = Alignment.Center
+                        ) { Text("\u266A", color = Color(0x99FFFFFF), fontSize = (20 * scale).sp) }
                     }
-                    if (showTitle || showArtist) {
-                        Column {
-                            if (showTitle) {
-                                Text(
-                                    text = nowPlaying.song.title,
-                                    color = Color.White,
-                                    fontSize = (13 * scale).sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 220.dp)
-                                )
-                            }
-                            if (showArtist) {
-                                Text(
-                                    text = nowPlaying.song.artist,
-                                    color = Color(0xAAFFFFFF),
-                                    fontSize = (11 * scale).sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 220.dp)
-                                )
-                            }
-                        }
+                }
+            }
+
+            if (showTitle || showArtist) {
+                // Weighted so a long title ellipsizes instead of pushing the controls/✕ off.
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(horizontal = (10 * scale).dp)
+                ) {
+                    if (showTitle) {
+                        Text(
+                            text = nowPlaying.song.title,
+                            color = Color.White,
+                            fontSize = (13 * scale).sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (showArtist) {
+                        Text(
+                            text = nowPlaying.song.artist,
+                            color = Color(0xAAFFFFFF),
+                            fontSize = (11 * scale).sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
