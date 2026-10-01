@@ -42,6 +42,12 @@ class SettingsRepository @Inject constructor(
         val CLOCK_FORMAT = stringPreferencesKey("clock_format")
         val SHOW_RATING = booleanPreferencesKey("show_rating")
         val SHOW_PERSON_AGE = booleanPreferencesKey("show_person_age")
+        val ORIENTATION_MODE = stringPreferencesKey("orientation_mode")
+
+        // Orientation modes: which photos may appear on screen.
+        const val ORIENTATION_ALL = "all"                 // every photo, shown alone
+        const val ORIENTATION_MATCH = "match"             // only photos matching the screen orientation
+        const val ORIENTATION_MATCH_PAIR = "match_pair"   // matching photos + opposite orientation two-up
 
         // Overlays
         val SHOW_CLOCK = booleanPreferencesKey("show_clock")
@@ -53,8 +59,47 @@ class SettingsRepository @Inject constructor(
         val SHOW_CAMERA = booleanPreferencesKey("show_camera")
         val DATE_FORMAT = stringPreferencesKey("date_format")
 
+        // Overlay presentation
+        val OVERLAY_TEXT_SIZE = stringPreferencesKey("overlay_text_size")
+        val OVERLAY_TEXT_COLOR = stringPreferencesKey("overlay_text_color")
+        val OVERLAY_BACKGROUND = booleanPreferencesKey("overlay_background")
+        val OVERLAY_BACKGROUND_OPACITY = intPreferencesKey("overlay_background_opacity")
+        val OVERLAY_CLOCK_POSITION = stringPreferencesKey("overlay_clock_position")
+        val OVERLAY_INFO_POSITION = stringPreferencesKey("overlay_info_position")
+        val OVERLAY_CORNER_RADIUS = intPreferencesKey("overlay_corner_radius")
+        val OVERLAY_ANIMATION = stringPreferencesKey("overlay_animation")
+        val OVERLAY_MARQUEE = booleanPreferencesKey("overlay_marquee")
+        val OVERLAY_EXPAND_SCALE = intPreferencesKey("overlay_expand_scale")
+        val OVERLAY_COLLAPSED_SECONDS = intPreferencesKey("overlay_collapsed_seconds")
+        val OVERLAY_EXPANDED_SECONDS = intPreferencesKey("overlay_expanded_seconds")
+        val OVERLAY_EXPANDED_INDEFINITE = booleanPreferencesKey("overlay_expanded_indefinite")
+        val OVERLAY_COLLAPSED_INDEFINITE = booleanPreferencesKey("overlay_collapsed_indefinite")
+        val OVERLAY_COLLAPSED_FIELDS = stringPreferencesKey("overlay_collapsed_fields")
+
+        // Overlay position values
+        const val OVERLAY_POS_TOP_START = "top_start"
+        const val OVERLAY_POS_TOP_END = "top_end"
+        const val OVERLAY_POS_BOTTOM_START = "bottom_start"
+        const val OVERLAY_POS_BOTTOM_END = "bottom_end"
+
+        // Overlay animation modes
+        const val OVERLAY_ANIM_STATIC = "static"
+        const val OVERLAY_ANIM_LOOP = "loop"
+        const val OVERLAY_ANIM_ONCE = "once"
+        // Legacy value kept only for reading pre-existing preferences.
+        const val OVERLAY_ANIM_LEGACY_EXPAND = "expand"
+
+        // Overlay field ids (used by the collapsed-fields selection)
+        const val OVERLAY_FIELD_DATE = "date"
+        const val OVERLAY_FIELD_LOCATION = "location"
+        const val OVERLAY_FIELD_DESCRIPTION = "description"
+        const val OVERLAY_FIELD_PEOPLE = "people"
+        const val OVERLAY_FIELD_CAMERA = "camera"
+        const val OVERLAY_FIELD_RATING = "rating"
+
         // Sync
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
+        val APPLIED_SYNC_INTERVAL_MINUTES = intPreferencesKey("applied_sync_interval_minutes")
         val MAX_CACHED_IMAGES = intPreferencesKey("max_cached_images")
         val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
 
@@ -74,6 +119,9 @@ class SettingsRepository @Inject constructor(
         val NAVIDROME_PASSWORD = stringPreferencesKey("navidrome_password")
         val NAVIDROME_ENABLED = booleanPreferencesKey("navidrome_enabled")
         val NAVIDROME_SYNC_PLAYLIST_IDS = stringPreferencesKey("navidrome_sync_playlist_ids")
+        val NAVIDROME_SYNC_FAVORITES = booleanPreferencesKey("navidrome_sync_favorites")
+        val NAVIDROME_MAX_CACHED_SONGS = intPreferencesKey("navidrome_max_cached_songs")
+        val DENON_HOST = stringPreferencesKey("denon_host")
         val LAST_MUSIC_SYNC_TIME = stringPreferencesKey("last_music_sync_time")
     }
 
@@ -97,6 +145,7 @@ class SettingsRepository @Inject constructor(
     val clockFormat: Flow<String> = context.dataStore.data.map { it[CLOCK_FORMAT] ?: "12" }
     val showRating: Flow<Boolean> = context.dataStore.data.map { it[SHOW_RATING] ?: false }
     val showPersonAge: Flow<Boolean> = context.dataStore.data.map { it[SHOW_PERSON_AGE] ?: false }
+    val orientationMode: Flow<String> = context.dataStore.data.map { it[ORIENTATION_MODE] ?: ORIENTATION_MATCH_PAIR }
 
     // Overlays
     val showClock: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CLOCK] ?: true }
@@ -108,8 +157,39 @@ class SettingsRepository @Inject constructor(
     val showCamera: Flow<Boolean> = context.dataStore.data.map { it[SHOW_CAMERA] ?: false }
     val dateFormat: Flow<String> = context.dataStore.data.map { it[DATE_FORMAT] ?: "MMM dd, yyyy" }
 
+    // Overlay presentation
+    val overlayTextSize: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_SIZE] ?: "medium" }
+    val overlayTextColor: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_COLOR] ?: "light" }
+    val overlayBackground: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_BACKGROUND] ?: true }
+    val overlayBackgroundOpacity: Flow<Int> = context.dataStore.data.map { it[OVERLAY_BACKGROUND_OPACITY] ?: 53 }
+    val overlayClockPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_CLOCK_POSITION] ?: OVERLAY_POS_TOP_START }
+    val overlayInfoPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_INFO_POSITION] ?: OVERLAY_POS_BOTTOM_START }
+    val overlayCornerRadius: Flow<Int> = context.dataStore.data.map { it[OVERLAY_CORNER_RADIUS] ?: 16 }
+    val overlayAnimation: Flow<String> = context.dataStore.data.map {
+        when (it[OVERLAY_ANIMATION]) {
+            null -> OVERLAY_ANIM_STATIC
+            OVERLAY_ANIM_LEGACY_EXPAND -> OVERLAY_ANIM_LOOP  // pre-existing "expand" == loop
+            else -> it[OVERLAY_ANIMATION] ?: OVERLAY_ANIM_STATIC
+        }
+    }
+    val overlayMarquee: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_MARQUEE] ?: false }
+    val overlayExpandScale: Flow<Int> = context.dataStore.data.map { it[OVERLAY_EXPAND_SCALE] ?: 130 }
+    val overlayCollapsedSeconds: Flow<Int> = context.dataStore.data.map { it[OVERLAY_COLLAPSED_SECONDS] ?: 6 }
+    val overlayExpandedSeconds: Flow<Int> = context.dataStore.data.map { it[OVERLAY_EXPANDED_SECONDS] ?: 6 }
+    val overlayExpandedIndefinite: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_EXPANDED_INDEFINITE] ?: false }
+    val overlayCollapsedIndefinite: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_COLLAPSED_INDEFINITE] ?: false }
+    val overlayCollapsedFields: Flow<Set<String>> = context.dataStore.data.map {
+        (it[OVERLAY_COLLAPSED_FIELDS] ?: OVERLAY_FIELD_DATE)
+            .split(",").map { id -> id.trim() }.filter { id -> id.isNotBlank() }.toSet()
+    }
+
+    suspend fun saveOverlayCollapsedFields(ids: Set<String>) {
+        context.dataStore.edit { it[OVERLAY_COLLAPSED_FIELDS] = ids.joinToString(",") }
+    }
+
     // Sync
     val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[SYNC_INTERVAL_MINUTES] ?: 60 }
+    val appliedSyncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[APPLIED_SYNC_INTERVAL_MINUTES] ?: 0 }
     val maxCachedImages: Flow<Int> = context.dataStore.data.map { it[MAX_CACHED_IMAGES] ?: 300 }
     val lastSyncTime: Flow<String> = context.dataStore.data.map { it[LAST_SYNC_TIME] ?: "Never" }
 
@@ -133,6 +213,9 @@ class SettingsRepository @Inject constructor(
     }
 
     val lastMusicSyncTime: Flow<String> = context.dataStore.data.map { it[LAST_MUSIC_SYNC_TIME] ?: "Never" }
+    val navidromeSyncFavorites: Flow<Boolean> = context.dataStore.data.map { it[NAVIDROME_SYNC_FAVORITES] ?: false }
+    val navidromeMaxCachedSongs: Flow<Int> = context.dataStore.data.map { it[NAVIDROME_MAX_CACHED_SONGS] ?: 200 }
+    val denonHost: Flow<String> = context.dataStore.data.map { it[DENON_HOST] ?: "10.89.97.15" }
 
     suspend fun saveSyncPlaylistIds(ids: Set<String>) {
         context.dataStore.edit { it[NAVIDROME_SYNC_PLAYLIST_IDS] = ids.joinToString(",") }
