@@ -93,6 +93,17 @@ fun SlideshowScreen(
     val overlayExpandedIndefinite by viewModel.overlayExpandedIndefinite.collectAsState()
     val overlayCollapsedIndefinite by viewModel.overlayCollapsedIndefinite.collectAsState()
     val overlayCollapsedFields by viewModel.overlayCollapsedFields.collectAsState()
+    val npShowArt by viewModel.npShowArt.collectAsState()
+    val npShowTitle by viewModel.npShowTitle.collectAsState()
+    val npShowArtist by viewModel.npShowArtist.collectAsState()
+    val npShowControls by viewModel.npShowControls.collectAsState()
+    val npScale by viewModel.npScale.collectAsState()
+    val npBackgroundOpacity by viewModel.npBackgroundOpacity.collectAsState()
+    val npCornerRadius by viewModel.npCornerRadius.collectAsState()
+    val npAnimation by viewModel.npAnimation.collectAsState()
+    val npExpandedSeconds by viewModel.npExpandedSeconds.collectAsState()
+    val npCollapsedSeconds by viewModel.npCollapsedSeconds.collectAsState()
+    val npCollapsedElements by viewModel.npCollapsedElements.collectAsState()
     val sleepEnabled by viewModel.sleepEnabled.collectAsState()
     val sleepStartHour by viewModel.sleepStartHour.collectAsState()
     val sleepEndHour by viewModel.sleepEndHour.collectAsState()
@@ -125,6 +136,20 @@ fun SlideshowScreen(
         collapsedIndefinite = overlayCollapsedIndefinite,
         marquee = overlayMarquee,
         collapsedFields = overlayCollapsedFields
+    )
+    val nowPlayingConfig = NowPlayingConfig(
+        showArt = npShowArt,
+        showTitle = npShowTitle,
+        showArtist = npShowArtist,
+        showControls = npShowControls,
+        scale = npScale / 100f,
+        backgroundOpacity = npBackgroundOpacity / 100f,
+        cornerRadius = npCornerRadius,
+        animationEnabled = npAnimation != SettingsRepository.OVERLAY_ANIM_STATIC,
+        loop = npAnimation == SettingsRepository.OVERLAY_ANIM_LOOP,
+        expandedSeconds = npExpandedSeconds,
+        collapsedSeconds = npCollapsedSeconds,
+        collapsedElements = npCollapsedElements
     )
 
     // Check if in sleep hours
@@ -341,6 +366,7 @@ fun SlideshowScreen(
                 nowPlaying = nowPlaying,
                 musicPlayer = viewModel.musicPlayer,
                 onClick = onOpenMusic,
+                config = nowPlayingConfig,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(20.dp)

@@ -126,6 +126,17 @@ fun SettingsScreen(
     val overlayExpandedIndefinite by settings.overlayExpandedIndefinite.collectAsState(initial = false)
     val overlayCollapsedIndefinite by settings.overlayCollapsedIndefinite.collectAsState(initial = false)
     val overlayCollapsedFields by settings.overlayCollapsedFields.collectAsState(initial = setOf(SettingsRepository.OVERLAY_FIELD_DATE))
+    val npShowArt by settings.npShowArt.collectAsState(initial = true)
+    val npShowTitle by settings.npShowTitle.collectAsState(initial = true)
+    val npShowArtist by settings.npShowArtist.collectAsState(initial = true)
+    val npShowControls by settings.npShowControls.collectAsState(initial = true)
+    val npScale by settings.npScale.collectAsState(initial = 100)
+    val npBackgroundOpacity by settings.npBackgroundOpacity.collectAsState(initial = 80)
+    val npCornerRadius by settings.npCornerRadius.collectAsState(initial = 16)
+    val npAnimation by settings.npAnimation.collectAsState(initial = SettingsRepository.OVERLAY_ANIM_STATIC)
+    val npExpandedSeconds by settings.npExpandedSeconds.collectAsState(initial = 10)
+    val npCollapsedSeconds by settings.npCollapsedSeconds.collectAsState(initial = 10)
+    val npCollapsedElements by settings.npCollapsedElements.collectAsState(initial = setOf("art"))
     val syncInterval by settings.syncIntervalMinutes.collectAsState(initial = 60)
     val maxCached by settings.maxCachedImages.collectAsState(initial = 300)
     val lastSync by settings.lastSyncTime.collectAsState(initial = "Never")
@@ -714,6 +725,79 @@ fun SettingsScreen(
         }
         SectionDivider()
 
+        // ── Now Playing Pill (over the slideshow) ──
+        var npOpen by remember { mutableStateOf(false) }
+        CollapsibleSection("Now Playing Pill", npOpen, { npOpen = !npOpen }) {
+            Text(
+                "Shown over the slideshow while music plays.",
+                color = subtextColor, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp)
+            )
+            SettingsToggle("Album Art", npShowArt) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ART, it) } }
+            SettingsToggle("Title", npShowTitle) { scope.launch { settings.save(SettingsRepository.NP_SHOW_TITLE, it) } }
+            SettingsToggle("Artist", npShowArtist) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ARTIST, it) } }
+            SettingsToggle("Play / Skip Controls", npShowControls) { scope.launch { settings.save(SettingsRepository.NP_SHOW_CONTROLS, it) } }
+
+            SliderSetting("Size", npScale.toFloat(), 75f..150f, "%") {
+                scope.launch { settings.save(SettingsRepository.NP_SCALE, it.roundToInt()) }
+            }
+            SliderSetting("Background Opacity", npBackgroundOpacity.toFloat(), 0f..100f, "%") {
+                scope.launch { settings.save(SettingsRepository.NP_BACKGROUND_OPACITY, it.roundToInt()) }
+            }
+            SliderSetting("Corner Radius", npCornerRadius.toFloat(), 0f..32f, "dp") {
+                scope.launch { settings.save(SettingsRepository.NP_CORNER_RADIUS, it.roundToInt()) }
+            }
+
+            OverlayChoiceRow(
+                "Collapse",
+                listOf(
+                    SettingsRepository.OVERLAY_ANIM_STATIC to "Static",
+                    SettingsRepository.OVERLAY_ANIM_LOOP to "Loop",
+                    SettingsRepository.OVERLAY_ANIM_ONCE to "Once"
+                ),
+                npAnimation
+            ) { scope.launch { settings.save(SettingsRepository.NP_ANIMATION, it) } }
+
+            if (npAnimation != SettingsRepository.OVERLAY_ANIM_STATIC) {
+                SliderSetting("Expanded Hold", npExpandedSeconds.toFloat(), 1f..120f, "s") {
+                    scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SECONDS, it.roundToInt()) }
+                }
+                if (npAnimation == SettingsRepository.OVERLAY_ANIM_LOOP) {
+                    SliderSetting("Collapsed Hold", npCollapsedSeconds.toFloat(), 1f..120f, "s") {
+                        scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SECONDS, it.roundToInt()) }
+                    }
+                }
+                Text("Collapsed Shows", color = textColor, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+                listOf(
+                    "art" to "Album Art",
+                    "title" to "Title",
+                    "artist" to "Artist",
+                    "controls" to "Controls"
+                ).chunked(2).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                        rowItems.forEach { (element, label) ->
+                            val selected = element in npCollapsedElements
+                            OutlinedButton(
+                                onClick = {
+                                    val updated =
+                                        if (selected) npCollapsedElements - element
+                                        else npCollapsedElements + element
+                                    scope.launch { settings.saveNpCollapsedElements(updated) }
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (selected) Color.Black else textColor,
+                                    containerColor = if (selected) sectionColor else Color.Transparent
+                                ),
+                                modifier = Modifier.height(34.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            ) { Text(label, fontSize = 12.sp) }
+                        }
+                    }
+                }
+            }
+        }
+
+        SectionDivider()
+
         // ── Sync & Cache ──
         var syncOpen by remember { mutableStateOf(false) }
         CollapsibleSection("Sync & Cache", syncOpen, { syncOpen = !syncOpen }) {
@@ -910,6 +994,11 @@ fun SettingsScreen(
             SliderSetting("Max Cached Songs", navidromeMaxCachedSongs.toFloat(), 50f..2000f, "", steps = 38) {
                 scope.launch { settings.save(SettingsRepository.NAVIDROME_MAX_CACHED_SONGS, it.roundToInt()) }
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = { SyncScheduler.triggerMusicSync(context) },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = sectionColor)
+            ) { Text("Sync Music Now", color = sectionColor) }
             Text(
                 "Songs in playlists marked \u201cCached\u201d (Music \u2192 Browse) plus favorites are stored on the device. Everything else streams.",
                 color = Color(0x88FFFFFF),

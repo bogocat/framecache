@@ -188,14 +188,9 @@ fun MusicScreen(
                     Text("Synced: $lastMusicSync", color = Color(0x66FFFFFF), fontSize = 10.sp)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(tabBg)
-                    .clickable { SyncScheduler.triggerMusicSync(context) }.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                    Text("Sync", color = accentColor, fontSize = 13.sp)
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(tabBg)
-                    .clickable(onClick = onBack).padding(horizontal = 12.dp, vertical = 10.dp)) {
-                    Text("Photos", color = Color.White, fontSize = 13.sp)
+                Box(modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(tabBg)
+                    .clickable(onClick = onBack).padding(horizontal = 20.dp, vertical = 14.dp)) {
+                    Text("Photos", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
 

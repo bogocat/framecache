@@ -1,6 +1,8 @@
 package com.bogocat.framecache.ui.slideshow
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -15,13 +17,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,22 +42,84 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.bogocat.framecache.music.MusicPlayer
 import com.bogocat.framecache.music.NowPlaying
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val pillBg = Color(0xCC000000)
-private val pillShape = RoundedCornerShape(16.dp)
 private val dividerColor = Color(0x33FFFFFF)
+
+// Elements the pill can show (expanded) and keep (collapsed).
+const val NP_ELEMENT_ART = "art"
+const val NP_ELEMENT_TITLE = "title"
+const val NP_ELEMENT_ARTIST = "artist"
+const val NP_ELEMENT_CONTROLS = "controls"
+
+/**
+ * Presentation config for the now-playing pill shown over the slideshow. Mirrors the
+ * photo-info overlay: a set of always/expanded elements, a size scale, and an optional
+ * expand->collapse cycle that keeps a configurable subset.
+ */
+data class NowPlayingConfig(
+    val showArt: Boolean = true,
+    val showTitle: Boolean = true,
+    val showArtist: Boolean = true,
+    val showControls: Boolean = true,
+    val scale: Float = 1f,
+    val backgroundOpacity: Float = 0.80f,
+    val cornerRadius: Int = 16,
+    val animationEnabled: Boolean = false,
+    val loop: Boolean = false,
+    val expandedSeconds: Int = 10,
+    val collapsedSeconds: Int = 10,
+    val collapsedElements: Set<String> = setOf(NP_ELEMENT_ART)
+)
 
 @Composable
 fun NowPlayingPill(
     nowPlaying: NowPlaying,
     musicPlayer: MusicPlayer,
     onClick: () -> Unit = {},
+    config: NowPlayingConfig = NowPlayingConfig(),
     modifier: Modifier = Modifier
 ) {
     val isActive = nowPlaying.song.id.isNotEmpty() &&
             (nowPlaying.isPlaying || musicPlayer.isActive())
     val scope = rememberCoroutineScope()
+
+    // Expand -> collapse lifecycle (same shape as the photo overlay). Starts full.
+    var expanded by remember { mutableStateOf(true) }
+    LaunchedEffect(
+        config.animationEnabled,
+        config.loop,
+        nowPlaying.song.id,
+        config.expandedSeconds,
+        config.collapsedSeconds
+    ) {
+        if (!config.animationEnabled) {
+            expanded = true
+            return@LaunchedEffect
+        }
+        expanded = true
+        while (true) {
+            delay(config.expandedSeconds * 1000L)
+            expanded = false
+            if (!config.loop) return@LaunchedEffect
+            delay(config.collapsedSeconds * 1000L)
+            expanded = true
+        }
+    }
+    val progress by animateFloatAsState(
+        targetValue = if (!config.animationEnabled || expanded) 1f else 0f,
+        animationSpec = tween(500),
+        label = "npCollapse"
+    )
+    val showFull = !config.animationEnabled || expanded
+    val scale = config.scale * (0.85f + 0.15f * progress)
+
+    fun show(element: String, enabled: Boolean) = enabled && (showFull || element in config.collapsedElements)
+    val showArt = show(NP_ELEMENT_ART, config.showArt)
+    val showTitle = show(NP_ELEMENT_TITLE, config.showTitle)
+    val showArtist = show(NP_ELEMENT_ARTIST, config.showArtist)
+    val showControls = show(NP_ELEMENT_CONTROLS, config.showControls)
 
     AnimatedVisibility(
         visible = isActive,
@@ -60,107 +129,108 @@ fun NowPlayingPill(
     ) {
         Row(
             modifier = Modifier
-                .widthIn(max = 340.dp)
-                .height(68.dp)
-                .clip(pillShape)
-                .background(pillBg),
+                .widthIn(max = 480.dp)
+                .height((64 * scale).dp)
+                .clip(RoundedCornerShape(config.cornerRadius.dp))
+                .background(Color.Black.copy(alpha = config.backgroundOpacity)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left zone: album art + text
-            // Tap = open music mode, Long-press = stop music
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { onClick() },
-                            onLongPress = { musicPlayer.clearQueue() }
+            // Left zone: art + text (tap = open music, long-press = stop music).
+            if (showArt || showTitle || showArtist) {
+                Row(
+                    modifier = Modifier
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { onClick() },
+                                onLongPress = { musicPlayer.clearQueue() }
+                            )
+                        }
+                        .padding(horizontal = (10 * scale).dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy((10 * scale).dp)
+                ) {
+                    if (showArt && nowPlaying.coverArtUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = nowPlaying.coverArtUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size((46 * scale).dp)
+                                .clip(RoundedCornerShape(8.dp))
                         )
                     }
-                    .padding(start = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (nowPlaying.coverArtUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = nowPlaying.coverArtUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
+                    if (showTitle || showArtist) {
+                        Column {
+                            if (showTitle) {
+                                Text(
+                                    text = nowPlaying.song.title,
+                                    color = Color.White,
+                                    fontSize = (13 * scale).sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 220.dp)
+                                )
+                            }
+                            if (showArtist) {
+                                Text(
+                                    text = nowPlaying.song.artist,
+                                    color = Color(0xAAFFFFFF),
+                                    fontSize = (11 * scale).sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 220.dp)
+                                )
+                            }
+                        }
+                    }
                 }
+            }
 
-                Column {
+            if (showControls) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(1.dp)
+                        .padding(vertical = 12.dp)
+                        .background(dividerColor)
+                )
+                Box(
+                    modifier = Modifier
+                        .width((52 * scale).dp)
+                        .fillMaxHeight()
+                        .clickable { musicPlayer.togglePlayPause() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = nowPlaying.song.title,
+                        text = if (nowPlaying.isPlaying) "||" else ">",
                         color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = nowPlaying.song.artist,
-                        color = Color(0xAAFFFFFF),
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        fontSize = (18 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
                     )
                 }
-            }
-
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .padding(vertical = 12.dp)
-                    .background(dividerColor)
-            )
-
-            // Play/pause
-            Box(
-                modifier = Modifier
-                    .width(56.dp)
-                    .fillMaxHeight()
-                    .clickable { musicPlayer.togglePlayPause() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (nowPlaying.isPlaying) "||" else ">",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(1.dp)
+                        .padding(vertical = 12.dp)
+                        .background(dividerColor)
                 )
-            }
-
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .padding(vertical = 12.dp)
-                    .background(dividerColor)
-            )
-
-            // Skip next
-            Box(
-                modifier = Modifier
-                    .width(56.dp)
-                    .fillMaxHeight()
-                    .clickable { scope.launch { musicPlayer.skipNext() } },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = ">>",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
+                Box(
+                    modifier = Modifier
+                        .width((52 * scale).dp)
+                        .fillMaxHeight()
+                        .clickable { scope.launch { musicPlayer.skipNext() } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = ">>",
+                        color = Color.White,
+                        fontSize = (18 * scale).sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

@@ -97,6 +97,20 @@ class SettingsRepository @Inject constructor(
         const val OVERLAY_FIELD_CAMERA = "camera"
         const val OVERLAY_FIELD_RATING = "rating"
 
+        // Now-playing pill (over the slideshow)
+        val NP_SHOW_ART = booleanPreferencesKey("np_show_art")
+        val NP_SHOW_TITLE = booleanPreferencesKey("np_show_title")
+        val NP_SHOW_ARTIST = booleanPreferencesKey("np_show_artist")
+        val NP_SHOW_CONTROLS = booleanPreferencesKey("np_show_controls")
+        val NP_SCALE = intPreferencesKey("np_scale")
+        val NP_BACKGROUND_OPACITY = intPreferencesKey("np_background_opacity")
+        val NP_CORNER_RADIUS = intPreferencesKey("np_corner_radius")
+        val NP_ANIMATION = stringPreferencesKey("np_animation")
+        val NP_LOOP = booleanPreferencesKey("np_loop")
+        val NP_EXPANDED_SECONDS = intPreferencesKey("np_expanded_seconds")
+        val NP_COLLAPSED_SECONDS = intPreferencesKey("np_collapsed_seconds")
+        val NP_COLLAPSED_ELEMENTS = stringPreferencesKey("np_collapsed_elements")
+
         // Sync
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val APPLIED_SYNC_INTERVAL_MINUTES = intPreferencesKey("applied_sync_interval_minutes")
@@ -185,6 +199,27 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveOverlayCollapsedFields(ids: Set<String>) {
         context.dataStore.edit { it[OVERLAY_COLLAPSED_FIELDS] = ids.joinToString(",") }
+    }
+
+    // Now-playing pill
+    val npShowArt: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_ART] ?: true }
+    val npShowTitle: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_TITLE] ?: true }
+    val npShowArtist: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_ARTIST] ?: true }
+    val npShowControls: Flow<Boolean> = context.dataStore.data.map { it[NP_SHOW_CONTROLS] ?: true }
+    val npScale: Flow<Int> = context.dataStore.data.map { it[NP_SCALE] ?: 100 }
+    val npBackgroundOpacity: Flow<Int> = context.dataStore.data.map { it[NP_BACKGROUND_OPACITY] ?: 80 }
+    val npCornerRadius: Flow<Int> = context.dataStore.data.map { it[NP_CORNER_RADIUS] ?: 16 }
+    val npAnimation: Flow<String> = context.dataStore.data.map { it[NP_ANIMATION] ?: OVERLAY_ANIM_STATIC }
+    val npLoop: Flow<Boolean> = context.dataStore.data.map { it[NP_LOOP] ?: false }
+    val npExpandedSeconds: Flow<Int> = context.dataStore.data.map { it[NP_EXPANDED_SECONDS] ?: 10 }
+    val npCollapsedSeconds: Flow<Int> = context.dataStore.data.map { it[NP_COLLAPSED_SECONDS] ?: 10 }
+    val npCollapsedElements: Flow<Set<String>> = context.dataStore.data.map {
+        (it[NP_COLLAPSED_ELEMENTS] ?: "art")
+            .split(",").map { id -> id.trim() }.filter { id -> id.isNotBlank() }.toSet()
+    }
+
+    suspend fun saveNpCollapsedElements(ids: Set<String>) {
+        context.dataStore.edit { it[NP_COLLAPSED_ELEMENTS] = ids.joinToString(",") }
     }
 
     // Sync
