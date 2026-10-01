@@ -8,11 +8,13 @@ import com.bogocat.framecache.data.settings.SettingsRepository
 import com.bogocat.framecache.music.MusicPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -90,35 +92,50 @@ class SlideshowViewModel @Inject constructor(
 
     private var slideshowJob: Job? = null
 
-    // Bumped on manual skip; the timer loop checks this to abandon stale iterations
-    // so a skip at e.g. 40/45s gives the next photo a fresh full duration.
+    // Every navigation trigger (timer, tap, rotation, mode change) funnels through a
+    // single conflated channel, so advances are serialised and a burst of "go next"
+    // requests collapses to one. Previously independent triggers could interleave at
+    // advance()'s DB suspension points and skip two photos.
+    private sealed interface Nav { data object Next : Nav; data object Prev : Nav }
+    private val navChannel = Channel<Nav>(Channel.CONFLATED)
+
+    // Bumped whenever navigation is requested; the timer loop checks this to abandon
+    // its current countdown so the next photo gets a fresh full duration.
     @Volatile private var advanceGeneration: Int = 0
 
     // Pushed by SlideshowScreen on configuration changes; drives pair direction.
     @Volatile private var isDeviceLandscape: Boolean = true
+
+    private fun requestNext() {
+        advanceGeneration++
+        navChannel.trySend(Nav.Next)
+    }
 
     fun setDeviceLandscape(landscape: Boolean) {
         val changed = isDeviceLandscape != landscape
         isDeviceLandscape = landscape
         // Re-pick under the new orientation so "match"/"match + pairs" apply
         // immediately after a rotation instead of waiting out the current photo.
-        if (changed && _state.value.currentAsset != null) {
-            viewModelScope.launch {
-                advanceGeneration++
-                advance()
-            }
-        }
+        if (changed && _state.value.currentAsset != null) requestNext()
     }
 
     init {
         startSlideshow()
-        // Apply a changed orientation policy without waiting for the current
-        // (possibly very long) duration to elapse.
+        // A single consumer owns all navigation, so advance() never runs concurrently
+        // with itself (it mutates history and _state across suspending DB calls).
         viewModelScope.launch {
-            settings.orientationMode.drop(1).collect {
-                advanceGeneration++
-                advance()
+            for (nav in navChannel) {
+                when (nav) {
+                    Nav.Next -> advance()
+                    Nav.Prev -> doPrevious()
+                }
             }
+        }
+        // Only react to a genuine orientation-mode change. DataStore emits on *any*
+        // preference write (e.g. a background sync updating LAST_SYNC_TIME), so without
+        // distinctUntilChanged the collector would spuriously advance the slideshow.
+        viewModelScope.launch {
+            settings.orientationMode.distinctUntilChanged().drop(1).collect { requestNext() }
         }
     }
 
@@ -164,10 +181,9 @@ class SlideshowViewModel @Inject constructor(
                     delay(stepMs)
                 }
 
-                // Only auto-advance if no manual skip happened during this cycle.
+                // Only auto-advance if nothing else already requested a change this cycle.
                 if (advanceGeneration == gen) {
-                    advanceGeneration++
-                    advance()
+                    requestNext()
                 }
             }
         }
@@ -265,21 +281,18 @@ class SlideshowViewModel @Inject constructor(
         _state.value = _state.value.copy(isPaused = !_state.value.isPaused)
     }
 
-    fun nextImage() {
-        viewModelScope.launch {
-            advanceGeneration++
-            advance()
-        }
-    }
+    fun nextImage() = requestNext()
 
     fun previousImage() {
-        viewModelScope.launch {
-            if (historyIndex > 0) {
-                advanceGeneration++
-                historyIndex--
-                val prev = history[historyIndex]
-                _state.value = _state.value.copy(currentAsset = prev, progress = 0f)
-            }
+        advanceGeneration++
+        navChannel.trySend(Nav.Prev)
+    }
+
+    private fun doPrevious() {
+        if (historyIndex > 0) {
+            historyIndex--
+            val prev = history[historyIndex]
+            _state.value = _state.value.copy(currentAsset = prev, progress = 0f)
         }
     }
 }
