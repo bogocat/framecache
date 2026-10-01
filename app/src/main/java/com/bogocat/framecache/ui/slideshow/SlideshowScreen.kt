@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -349,15 +351,16 @@ fun SlideshowScreen(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(20.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x88000000))
-                    .clickable(onClick = onOpenMusic)
-                    .padding(horizontal = 15.dp, vertical = 10.dp)
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x14000000))
+                    .clickable(onClick = onOpenMusic),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "\u266B",  // beamed music note
-                    color = Color(0xCCFFFFFF),
-                    fontSize = 20.sp
+                    color = Color(0xE6FFFFFF),
+                    fontSize = 22.sp
                 )
             }
         }
