@@ -20,16 +20,19 @@ FrameCache: Device app ←—reads local disk—→ [cached JPEGs + Room DB]
 ## Features
 
 - **Offline-first** — photos cached locally on the device, slideshow never touches the network
-- **Background sync** — WorkManager downloads new photos hourly when WiFi is available
+- **Background sync** — configurable interval; downloads new photos when WiFi is available
 - **Weighted random** — every photo shown before any repeats
+- **Orientation filter** — show all photos, only those matching the screen orientation, or matching + opposite-orientation shown two-up
 - **Ken Burns effect** — configurable slow zoom/pan animation
 - **Crossfade transitions** — smooth blending between photos
 - **Background blur** — blurred version of the photo behind the main image
-- **Metadata overlays** — clock, date, photo date, location, description, people, camera (all toggleable, pill-style)
+- **Metadata overlays** — clock, date, photo date, location, description, people, camera, rating, person age
+- **Overlay styling & motion** — independent expanded/collapsed sizes, corner position, text size/colour, background opacity, corner radius, marquee for long lines, and a Static/Loop/Once expand-collapse cycle
+- **Music (Navidrome)** — browse artists → albums → songs, cache favourites / playlists / individual songs offline, with a configurable now-playing pill over the slideshow
+- **Cast to Denon** — stream playback to a Denon/HEOS receiver over DLNA (the receiver pulls the stream directly); accurate progress + seeking
 - **Sleep schedule** — dim or black screen during configurable hours
-- **Orientation lock** — auto, landscape, or portrait
-- **Settings** — swipe down or long-press from the slideshow
-- **Android Settings access** — WiFi and system settings accessible from the app
+- **Settings** — swipe down or long-press from the slideshow; collapsible sections
+- **Android Settings access** — WiFi, Bluetooth and system settings accessible from the app
 - **ADB config** — push server URL, API key, and album IDs via intent extras (no typing on the device)
 - **DreamService** — works as an Android screensaver
 - **Launcher mode** — can replace the home screen on dedicated frames
@@ -78,13 +81,15 @@ Swipe down or long-press on the slideshow to open settings.
 
 | Section | Options |
 |---------|---------|
-| **Connection** | Server URL, API key, album IDs (protected by default, tap Edit to modify) |
-| **Slideshow** | Photo duration (5-120s), crossfade speed, Ken Burns on/off + zoom, background blur, fit vs fill |
-| **Overlays** | Clock, current date, photo date, location, description, people, camera |
-| **Sync** | Sync interval (15min-6hr), max cached photos (50-1000), manual sync, last sync time |
-| **Sleep** | Enable/disable, start/end hours, dim vs black |
-| **Display** | Orientation lock (auto/landscape/portrait) |
-| **System** | Android Settings, WiFi Settings |
+| **Server Connection** | Server URL, API key, album IDs |
+| **Photo Sources** | Immich albums, local folder |
+| **Slideshow** | Photo duration (presets + custom, 1s–24h), crossfade, Ken Burns + zoom, background blur, fill vs fit, progress bar, order, favourites only, photo orientation |
+| **Overlays** | Show toggles (clock, date, photo date, location, description, people, camera, rating, age); overlay style (position, text size/colour, background + opacity, corner radius); motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
+| **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements |
+| **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
+| **Sleep Schedule** | Enable/disable, start/end hours, dim vs black |
+| **Music (Navidrome)** | Server/credentials, enable, cache favourites, max cached songs, Denon host, sync now |
+| **System** | Android Settings, WiFi, Bluetooth |
 
 ## Architecture
 
@@ -104,11 +109,26 @@ The sync and display layers are decoupled — adding new photo sources (Google P
 
 > Note: `POST /search/random` doesn't work for shared-album users in Immich, which is why we fetch the full album and randomize client-side.
 
+### Music (Navidrome) & Denon
+
+Optional: connect a [Navidrome](https://www.navidrome.org/) (Subsonic-compatible) server for music.
+
+- The full library metadata is indexed; **audio is cached only for what you choose** — playlists
+  marked “Cached”, favourites (starred), and individual songs / albums / artists pinned from the
+  browse screens. Downloads are incremental and resumable.
+- Browse by **artist → album → songs**, plus playlists, favourites and search, with a cache toggle
+  at each level (bulk selections over 50 songs ask for confirmation).
+- **Cast to a Denon/HEOS receiver** over DLNA: the receiver pulls the authenticated Navidrome
+  stream directly, so audio survives the frame sleeping. Progress and seeking are read from / sent
+  to the receiver. Toggle it from the now-playing pill (long-press the pill).
+- A configurable **now-playing pill** shows art/title/artist/controls over the slideshow and can
+  auto-collapse to a minimal set.
+
 ## Requirements
 
 - Android 6.0+ (API 23)
-- An Immich server with an API key
-- At least one shared album
+- An Immich server with an API key and at least one shared album
+- *Optional:* a Navidrome server for music, and/or a Denon/HEOS receiver for casting
 
 ## License
 
