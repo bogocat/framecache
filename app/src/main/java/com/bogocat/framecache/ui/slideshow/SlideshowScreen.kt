@@ -352,12 +352,12 @@ fun SlideshowScreen(
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0x88000000))
                     .clickable(onClick = onOpenMusic)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 15.dp, vertical = 10.dp)
             ) {
                 Text(
-                    text = "Music",
-                    color = Color(0xAAFFFFFF),
-                    fontSize = 13.sp
+                    text = "\u266B",  // beamed music note
+                    color = Color(0xCCFFFFFF),
+                    fontSize = 20.sp
                 )
             }
         }
