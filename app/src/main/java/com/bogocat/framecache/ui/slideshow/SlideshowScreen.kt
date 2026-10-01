@@ -362,8 +362,11 @@ fun SlideshowScreen(
         }
 
         // Now playing pill — ABOVE touch zone so controls receive taps
+        // Keep the pill visible across track transitions / buffering: an in-flight
+        // auto-advance briefly reports not-active, which used to flash the ♫ launcher.
         val musicActive = nowPlaying.song.id.isNotEmpty() &&
-                (nowPlaying.isPlaying || viewModel.musicPlayer.isActive())
+                (nowPlaying.isPlaying || viewModel.musicPlayer.isActive() ||
+                        viewModel.musicPlayer.queue.value.items.isNotEmpty())
 
         if (musicActive) {
             NowPlayingPill(
