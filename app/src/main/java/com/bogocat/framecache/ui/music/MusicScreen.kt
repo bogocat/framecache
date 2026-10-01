@@ -2,6 +2,7 @@ package com.bogocat.framecache.ui.music
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
@@ -224,6 +227,8 @@ private fun NowPlayingTab(
     musicPlayer: MusicPlayer, progress: Float, positionMs: Float, queueSource: String
 ) {
     val scope = rememberCoroutineScope()
+    val denonOn by musicPlayer.denonOutput.collectAsState()
+    var showDenonMenu by remember { mutableStateOf(false) }
     if (nowPlaying.song.id.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("No music playing", color = dimText, fontSize = 16.sp)
@@ -232,11 +237,25 @@ private fun NowPlayingTab(
     }
 
     Row(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp)) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.weight(1f).fillMaxHeight()
+                .pointerInput(Unit) { detectTapGestures(onLongPress = { showDenonMenu = true }) },
+            contentAlignment = Alignment.Center
+        ) {
             if (nowPlaying.coverArtUrl.isNotEmpty()) {
                 AsyncImage(model = nowPlaying.coverArtUrl, contentDescription = "Album art",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.size(260.dp).clip(RoundedCornerShape(16.dp)))
+            }
+            // Long-press the album art for output options (e.g. cast to the Denon).
+            DropdownMenu(expanded = showDenonMenu, onDismissRequest = { showDenonMenu = false }) {
+                DropdownMenuItem(
+                    text = { Text(if (denonOn) "Stop Denon" else "Play on Denon") },
+                    onClick = {
+                        showDenonMenu = false
+                        musicPlayer.setDenonOutput(!denonOn)
+                    }
+                )
             }
         }
         Column(modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -251,6 +270,7 @@ private fun NowPlayingTab(
             Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(if (nowPlaying.cached) "Cached" else "Streaming",
                     color = if (nowPlaying.cached) greenCache else Color(0xFFFFAB40), fontSize = 11.sp)
+                if (denonOn) Text("Denon", color = Color(0xFFFFB74D), fontSize = 11.sp)
                 if (queueSource.isNotEmpty()) Text(queueSource, color = Color(0x66FFFFFF), fontSize = 11.sp)
             }
             Spacer(modifier = Modifier.height(20.dp))
@@ -281,6 +301,7 @@ private sealed class BrowseRoute {
     data object ArtistList : BrowseRoute()
     data class ArtistDetail(val name: String) : BrowseRoute()
     data object SongList : BrowseRoute()
+    data object Favorites : BrowseRoute()
     data class Search(val query: String) : BrowseRoute()
 }
 
@@ -340,6 +361,7 @@ private fun BrowseTab(
                 onPlaylists = { route = BrowseRoute.PlaylistList },
                 onArtists = { route = BrowseRoute.ArtistList },
                 onSongs = { route = BrowseRoute.SongList },
+                onFavorites = { route = BrowseRoute.Favorites },
                 onSearch = { route = BrowseRoute.Search(it) },
                 musicPlayer = musicPlayer
             )
@@ -371,6 +393,10 @@ private fun BrowseTab(
                 loadSongs = { if (cachedOnly) songDao.getAllCachedSongs() else songDao.getAllSongs() },
                 source = "All Songs", musicPlayer = musicPlayer, cachedOnly = cachedOnly
             )
+            BrowseRoute.Favorites -> SongListView(
+                loadSongs = { songDao.getStarredSongs() },
+                source = "Favorites", musicPlayer = musicPlayer, cachedOnly = cachedOnly
+            )
             is BrowseRoute.Search -> {
                 val q = (route as BrowseRoute.Search).query
                 SongListView(
@@ -387,6 +413,7 @@ private fun BrowseHome(
     playlists: List<CachedPlaylist>, songDao: SongDao, cachedOnly: Boolean,
     onCachedToggle: (Boolean) -> Unit,
     onPlaylists: () -> Unit, onArtists: () -> Unit, onSongs: () -> Unit,
+    onFavorites: () -> Unit,
     onSearch: (String) -> Unit,
     musicPlayer: MusicPlayer
 ) {
@@ -394,12 +421,14 @@ private fun BrowseHome(
     var artistCount by remember { mutableStateOf(0) }
     var songCount by remember { mutableStateOf(0) }
     var cachedSongCount by remember { mutableStateOf(0) }
+    var starredCount by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         artistCount = songDao.getAllArtists().size
         songCount = songDao.getTotalCount()
         cachedSongCount = songDao.getCachedCount()
+        starredCount = songDao.getStarredCount()
     }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -452,6 +481,7 @@ private fun BrowseHome(
         }
 
         // Navigation rows
+        item { BrowseRow("Favorites", "$starredCount starred", onClick = onFavorites) }
         item { BrowseRow("Playlists", "${playlists.size}", onClick = onPlaylists) }
         item { BrowseRow("Artists", "$artistCount", onClick = onArtists) }
         item { BrowseRow("All Songs", "$songCount ($cachedSongCount cached)", onClick = onSongs) }

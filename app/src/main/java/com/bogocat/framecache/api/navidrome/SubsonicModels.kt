@@ -179,3 +179,18 @@ data class SearchResult(
     val album: List<Album>? = null,
     val song: List<Song>? = null
 )
+
+// -- getStarred2 (favorites) --
+
+class Starred2Response(
+    status: String = "",
+    version: String = "",
+    error: SubsonicError? = null,
+    val starred2: Starred2? = null
+) : SubsonicResponse(status, version, error)
+
+data class Starred2(
+    val artist: List<Artist>? = null,
+    val album: List<Album>? = null,
+    val song: List<Song>? = null
+)

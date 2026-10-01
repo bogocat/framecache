@@ -6,6 +6,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.bogocat.framecache.api.navidrome.NavidromeClient
+import com.bogocat.framecache.api.navidrome.Song
 import com.bogocat.framecache.data.cache.MusicCacheManager
 import com.bogocat.framecache.data.db.CachedPlaylist
 import com.bogocat.framecache.data.db.CachedSong
@@ -42,16 +43,20 @@ class MusicSyncWorker @AssistedInject constructor(
 
         return try {
             val syncIds = settings.navidromeSyncPlaylistIds.first()
+            val syncFavorites = settings.navidromeSyncFavorites.first()
+            val maxSongs = settings.navidromeMaxCachedSongs.first()
 
             syncLibrary()
+            syncStarred()
             syncPlaylists()
-            cleanUnsyncedPlaylists(syncIds)
-            downloadUncachedSongs(syncIds)
-            cacheManager.evictIfNeeded()
+            pruneUnwantedFiles(syncIds, syncFavorites)
+            downloadUncachedSongs(syncIds, syncFavorites)
+            cacheManager.evictIfNeeded(maxSongs)
 
             val cached = songDao.getCachedCount()
             val total = songDao.getTotalCount()
-            Log.i(TAG, "Music sync complete: $cached/$total songs cached")
+            val starred = songDao.getStarredCount()
+            Log.i(TAG, "Music sync complete: $cached/$total songs cached, $starred starred")
 
             val now = java.text.SimpleDateFormat("MMM dd, h:mm a", java.util.Locale.getDefault())
                 .format(java.util.Date())
@@ -89,25 +94,7 @@ class MusicSyncWorker @AssistedInject constructor(
                 try {
                     val (albumDetail, songs) = navidromeClient.getAlbum(album.id)
                     val cachedSongs = songs.map { song ->
-                        val existing = songDao.getById(song.id)
-                        CachedSong(
-                            id = song.id,
-                            title = song.title,
-                            artist = song.artist,
-                            album = song.album,
-                            albumId = song.albumId,
-                            artistId = song.artistId,
-                            coverArt = song.coverArt,
-                            duration = song.duration,
-                            track = song.track,
-                            year = song.year,
-                            genre = song.genre,
-                            filePath = existing?.filePath,
-                            coverPath = existing?.coverPath,
-                            fileSize = existing?.fileSize ?: 0,
-                            playCount = existing?.playCount ?: 0,
-                            lastPlayed = existing?.lastPlayed
-                        )
+                        song.toCachedSong(songDao.getById(song.id))
                     }
                     if (cachedSongs.isNotEmpty()) {
                         songDao.insertSongs(cachedSongs)
@@ -171,45 +158,100 @@ class MusicSyncWorker @AssistedInject constructor(
         Log.i(TAG, "Synced ${remotePlaylists.size} playlists")
     }
 
-    private suspend fun cleanUnsyncedPlaylists(syncIds: Set<String>) {
-        if (syncIds.isEmpty()) return
-
-        val allPlaylists = songDao.getAllPlaylists()
-        for (playlist in allPlaylists) {
-            if (playlist.id in syncIds) continue
-
-            val songs = songDao.getSongsForPlaylist(playlist.id)
-            var cleaned = 0
-            for (song in songs) {
-                if (song.filePath != null && song.filePath.isNotEmpty()) {
-                    File(song.filePath).delete()
-                    song.coverPath?.let { File(it).delete() }
-                    songDao.updateFilePath(song.id, "", 0)
-                    cleaned++
-                }
-            }
-            if (cleaned > 0) Log.i(TAG, "Cleaned $cleaned cached files from unsynced playlist '${playlist.name}'")
+    /**
+     * Pull starred (favorited) song ids and flag them in the index. Also inserts
+     * any starred song that isn't already present in the library index.
+     */
+    private suspend fun syncStarred() {
+        val starred = try {
+            navidromeClient.getStarredSongs()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch starred songs: ${e.message}")
+            return
         }
+
+        songDao.clearStarred()
+        if (starred.isEmpty()) {
+            Log.i(TAG, "No starred songs")
+            return
+        }
+
+        val missing = starred.filter { songDao.getById(it.id) == null }
+        if (missing.isNotEmpty()) {
+            songDao.insertSongs(missing.map { it.toCachedSong(null).copy(isStarred = true) })
+        }
+
+        starred.map { it.id }.chunked(500).forEach { ids -> songDao.markStarred(ids) }
+        Log.i(TAG, "Starred: ${starred.size} songs")
     }
 
-    private suspend fun downloadUncachedSongs(syncIds: Set<String>) {
-        if (syncIds.isEmpty()) {
-            Log.d(TAG, "No playlists selected for caching")
+    /**
+     * Deletes cached audio that is no longer wanted (not in a selected playlist and
+     * not starred when favorites caching is on). Index rows are kept — only the
+     * local files are removed, so the song stays available for streaming.
+     */
+    private suspend fun pruneUnwantedFiles(syncIds: Set<String>, syncFavorites: Boolean) {
+        if (syncIds.isEmpty() && !syncFavorites) {
+            Log.d(TAG, "No cache sources selected — keeping existing audio")
             return
         }
 
-        val uncached = songDao.getUncachedSongsForPlaylists(syncIds.toList(), DOWNLOAD_BATCH_SIZE)
-        if (uncached.isEmpty()) {
-            Log.d(TAG, "All selected playlist songs cached")
+        val keep = mutableSetOf<String>()
+        if (syncIds.isNotEmpty()) keep += songDao.getSongIdsForPlaylists(syncIds.toList())
+        if (syncFavorites) keep += songDao.getStarredSongs().map { it.id }
+
+        var removed = 0
+        for (song in songDao.getAllCachedWithPath()) {
+            if (song.id in keep) continue
+            song.filePath?.let { File(it).delete() }
+            song.coverPath?.let { File(it).delete() }
+            songDao.clearPaths(song.id)
+            removed++
+        }
+        if (removed > 0) Log.i(TAG, "Pruned $removed song(s) no longer selected for caching")
+    }
+
+    private suspend fun downloadUncachedSongs(syncIds: Set<String>, syncFavorites: Boolean) {
+        val uncached = mutableListOf<CachedSong>()
+        if (syncIds.isNotEmpty()) {
+            uncached += songDao.getUncachedSongsForPlaylists(syncIds.toList(), DOWNLOAD_BATCH_SIZE)
+        }
+        if (syncFavorites && uncached.size < DOWNLOAD_BATCH_SIZE) {
+            uncached += songDao.getUncachedStarred(DOWNLOAD_BATCH_SIZE - uncached.size)
+        }
+
+        val batch = uncached.distinctBy { it.id }
+        if (batch.isEmpty()) {
+            Log.d(TAG, "All selected songs cached")
             return
         }
 
-        Log.i(TAG, "Downloading ${uncached.size} songs")
-        for (song in uncached) {
+        Log.i(TAG, "Downloading ${batch.size} songs")
+        for (song in batch) {
             cacheManager.downloadSong(song.id)
             if (song.coverArt != null && song.coverPath == null) {
                 cacheManager.downloadCover(song.id, song.coverArt)
             }
         }
     }
+
+    private fun Song.toCachedSong(existing: CachedSong?): CachedSong = CachedSong(
+        id = id,
+        title = title,
+        artist = artist,
+        album = album,
+        albumId = albumId,
+        artistId = artistId,
+        coverArt = coverArt,
+        duration = duration,
+        track = track,
+        year = year,
+        genre = genre,
+        filePath = existing?.filePath,
+        coverPath = existing?.coverPath,
+        fileSize = existing?.fileSize ?: 0,
+        playCount = existing?.playCount ?: 0,
+        lastPlayed = existing?.lastPlayed,
+        isStarred = existing?.isStarred ?: false
+    )
 }

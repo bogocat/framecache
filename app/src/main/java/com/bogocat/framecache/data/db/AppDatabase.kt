@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 @Database(
     entities = [CachedAsset::class, CachedSong::class, CachedPlaylist::class, PlaylistSong::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +34,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE cached_assets ADD COLUMN updatedAt TEXT")
             }
         }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cached_songs ADD COLUMN isStarred INTEGER NOT NULL DEFAULT 0")
+            }
+        }
     }
 }
 
@@ -48,7 +54,7 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "framecache.db"
-        ).addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+        ).addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
             .fallbackToDestructiveMigration().build()
     }
 

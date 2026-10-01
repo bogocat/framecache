@@ -85,11 +85,13 @@ class MusicCacheManager @Inject constructor(
         if (count > maxCount) {
             val toEvict = songDao.getOldestPlayed(count - maxCount)
             for (song in toEvict) {
+                // Delete the audio/cover files but keep the row so the song stays
+                // in the indexed library (it just becomes streaming-only).
                 song.filePath?.let { File(it).delete() }
                 song.coverPath?.let { File(it).delete() }
-                songDao.delete(song.id)
+                songDao.clearPaths(song.id)
             }
-            Log.i(TAG, "Evicted ${toEvict.size} songs")
+            Log.i(TAG, "Evicted ${toEvict.size} song files (kept index rows)")
         }
     }
 

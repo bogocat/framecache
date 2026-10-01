@@ -25,6 +25,9 @@ interface SubsonicApi {
         @Query("size") size: Int = 20
     ): SubsonicEnvelope<RandomSongsResponse>
 
+    @GET("rest/getStarred2")
+    suspend fun getStarred2(): SubsonicEnvelope<Starred2Response>
+
     @GET("rest/getAlbum")
     suspend fun getAlbum(@Query("id") id: String): SubsonicEnvelope<AlbumResponse>
 

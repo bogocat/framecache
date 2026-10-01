@@ -40,11 +40,39 @@ interface SongDao {
     """)
     suspend fun getUncachedSongsForPlaylists(playlistIds: List<String>, limit: Int): List<CachedSong>
 
+    @Query("""
+        SELECT DISTINCT s.id FROM cached_songs s
+        INNER JOIN playlist_songs ps ON s.id = ps.songId
+        WHERE ps.playlistId IN (:playlistIds)
+    """)
+    suspend fun getSongIdsForPlaylists(playlistIds: List<String>): List<String>
+
+    // -- Starred / favorites --
+
+    @Query("UPDATE cached_songs SET isStarred = 0")
+    suspend fun clearStarred()
+
+    @Query("UPDATE cached_songs SET isStarred = 1 WHERE id IN (:ids)")
+    suspend fun markStarred(ids: List<String>)
+
+    @Query("SELECT COUNT(*) FROM cached_songs WHERE isStarred = 1")
+    suspend fun getStarredCount(): Int
+
+    @Query("SELECT * FROM cached_songs WHERE isStarred = 1 ORDER BY artist ASC, album ASC, track ASC, title ASC")
+    suspend fun getStarredSongs(): List<CachedSong>
+
+    @Query("SELECT * FROM cached_songs WHERE isStarred = 1 AND (filePath IS NULL OR filePath = '') LIMIT :limit")
+    suspend fun getUncachedStarred(limit: Int): List<CachedSong>
+
     @Query("UPDATE cached_songs SET filePath = :path, fileSize = :size WHERE id = :id")
     suspend fun updateFilePath(id: String, path: String, size: Long)
 
     @Query("UPDATE cached_songs SET coverPath = :path WHERE id = :id")
     suspend fun updateCoverPath(id: String, path: String)
+
+    // Drop the local files for a song without removing it from the index.
+    @Query("UPDATE cached_songs SET filePath = '', coverPath = NULL, fileSize = 0 WHERE id = :id")
+    suspend fun clearPaths(id: String)
 
     @Query("UPDATE cached_songs SET playCount = playCount + 1, lastPlayed = :now WHERE id = :id")
     suspend fun markPlayed(id: String, now: Long = System.currentTimeMillis())
@@ -60,6 +88,9 @@ interface SongDao {
 
     @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != '' ORDER BY lastPlayed ASC LIMIT :count")
     suspend fun getOldestPlayed(count: Int): List<CachedSong>
+
+    @Query("SELECT * FROM cached_songs WHERE filePath IS NOT NULL AND filePath != ''")
+    suspend fun getAllCachedWithPath(): List<CachedSong>
 
     @Query("DELETE FROM cached_songs WHERE id = :id")
     suspend fun delete(id: String)

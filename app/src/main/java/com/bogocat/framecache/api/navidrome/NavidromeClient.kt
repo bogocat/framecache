@@ -54,6 +54,11 @@ class NavidromeClient @Inject constructor(
         return api.getRandomSongs(size).response.randomSongs?.song.orEmpty()
     }
 
+    /** Starred (favorited) songs. */
+    suspend fun getStarredSongs(): List<Song> {
+        return api.getStarred2().response.starred2?.song.orEmpty()
+    }
+
     suspend fun getAlbum(id: String): Pair<Album, List<Song>> {
         val album = api.getAlbum(id).response.album
             ?: return Pair(Album(), emptyList())

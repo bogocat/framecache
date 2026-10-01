@@ -11,6 +11,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.bogocat.framecache.api.denon.DenonClient
 import com.bogocat.framecache.api.navidrome.NavidromeClient
 import com.bogocat.framecache.api.navidrome.Song
 import com.bogocat.framecache.data.cache.MusicCacheManager
@@ -19,10 +20,13 @@ import com.bogocat.framecache.data.db.SongDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
@@ -50,7 +54,8 @@ class MusicPlayer @Inject constructor(
     @ApplicationContext private val context: Context,
     private val navidromeClient: NavidromeClient,
     private val songDao: SongDao,
-    private val cacheManager: MusicCacheManager
+    private val cacheManager: MusicCacheManager,
+    private val denonClient: DenonClient
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -59,6 +64,11 @@ class MusicPlayer @Inject constructor(
 
     private val _queue = MutableStateFlow(QueueState())
     val queue: StateFlow<QueueState> = _queue.asStateFlow()
+
+    // When true, audio is sent to the Denon receiver instead of the local speaker.
+    private val _denonOutput = MutableStateFlow(false)
+    val denonOutput: StateFlow<Boolean> = _denonOutput.asStateFlow()
+    private var denonPollJob: Job? = null
 
     private var player: ExoPlayer? = null
 
@@ -101,8 +111,13 @@ class MusicPlayer @Inject constructor(
 
     /**
      * Play a song. Uses local cache if available, otherwise streams.
+     * When Denon output is enabled the receiver streams the track directly.
      */
     suspend fun play(song: Song) {
+        if (_denonOutput.value) {
+            playOnDenon(song)
+            return
+        }
         // Check cache first
         val cachedSong = songDao.getById(song.id)
         val isCached = cachedSong?.filePath != null && File(cachedSong.filePath).exists()
@@ -149,6 +164,54 @@ class MusicPlayer @Inject constructor(
 
         // Scrobble (best effort)
         try { navidromeClient.scrobble(song.id, submission = false) } catch (_: Exception) {}
+    }
+
+    // -- Denon receiver output --
+
+    /** Route playback to the Denon receiver (and re-cast the current track). */
+    fun setDenonOutput(on: Boolean) {
+        if (_denonOutput.value == on) return
+        _denonOutput.value = on
+        if (on) {
+            player?.pause()
+            startDenonPoller()
+            val current = _nowPlaying.value.song
+            if (current.id.isNotEmpty()) scope.launch { playOnDenon(current) }
+        } else {
+            denonPollJob?.cancel()
+            denonPollJob = null
+            scope.launch { denonClient.stop() }
+        }
+    }
+
+    private suspend fun playOnDenon(song: Song) {
+        val url = navidromeClient.getStreamUrl(song.id)
+        val ok = denonClient.playStream(url, song.title, song.artist, song.album)
+        val coverUrl = song.coverArt?.let { navidromeClient.getCoverArtUrl(it, 600) } ?: ""
+        _nowPlaying.value = NowPlaying(
+            song = song,
+            coverArtUrl = coverUrl,
+            isPlaying = ok,
+            duration = song.duration * 1000L,
+            cached = false
+        )
+        songDao.markPlayed(song.id)
+        try { navidromeClient.scrobble(song.id, submission = false) } catch (_: Exception) {}
+    }
+
+    /** The Denon tells us when a track ends, so poll and advance the queue from there. */
+    private fun startDenonPoller() {
+        denonPollJob?.cancel()
+        denonPollJob = scope.launch {
+            while (isActive && _denonOutput.value) {
+                delay(5000)
+                if (!_denonOutput.value) break
+                val state = denonClient.getTransportState()
+                if (state == "STOPPED" || state == "NO_MEDIA_PRESENT") {
+                    autoAdvance()
+                }
+            }
+        }
     }
 
     suspend fun playQueue(songs: List<Song>, startIndex: Int = 0, source: String = "", shuffle: Boolean = false) {
@@ -228,6 +291,7 @@ class MusicPlayer @Inject constructor(
 
     fun clearQueue() {
         player?.stop()
+        if (_denonOutput.value) scope.launch { denonClient.stop() }
         _queue.value = QueueState()
         _nowPlaying.value = NowPlaying()
     }
@@ -243,6 +307,14 @@ class MusicPlayer @Inject constructor(
     }
 
     fun togglePlayPause() {
+        if (_denonOutput.value) {
+            scope.launch {
+                val playing = _nowPlaying.value.isPlaying
+                if (playing) denonClient.pause() else denonClient.play()
+                _nowPlaying.value = _nowPlaying.value.copy(isPlaying = !playing)
+            }
+            return
+        }
         val exo = player ?: return
         if (exo.isPlaying) exo.pause() else exo.play()
     }
@@ -259,10 +331,13 @@ class MusicPlayer @Inject constructor(
 
     fun getDuration(): Long = player?.duration?.takeIf { it > 0 } ?: _nowPlaying.value.duration
 
-    fun isActive(): Boolean = player?.isPlaying == true ||
+    fun isActive(): Boolean = (_denonOutput.value && _nowPlaying.value.isPlaying) ||
+            player?.isPlaying == true ||
             (player?.playbackState == Player.STATE_READY && player?.playWhenReady == false)
 
     fun release() {
+        denonPollJob?.cancel()
+        denonPollJob = null
         player?.removeListener(playerListener)
         player?.release()
         player = null
