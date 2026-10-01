@@ -15,13 +15,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -257,10 +255,9 @@ fun BoxScope.PhotoInfoPill(
     val pinnedIds = lines.filter { it.id in animation.collapsedFields }.map { it.id }.toSet()
     val nothingPinned = pinnedIds.isEmpty()
     val showAllLines = !animation.enabled || expanded
-    // The little "info" affordance only appears while collapsed.
-    val showIcon = animation.enabled && !expanded
+    // The affordance only appears when the collapse would otherwise show nothing.
+    val showIcon = animation.enabled && !expanded && nothingPinned
     val lineSpacing = if (animation.enabled) 6f * progress else 0f
-    val firstPinnedId = lines.firstOrNull { it.id in pinnedIds }?.id
 
     val pillModifier = Modifier
         .align(alignment)
@@ -302,13 +299,7 @@ fun BoxScope.PhotoInfoPill(
                     val isPinned = line.id in pinnedIds
                     @Composable
                     fun renderLine() {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (showIcon && line.id == firstPinnedId) {
-                                InfoGlyph(style.primary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            lineText(line)
-                        }
+                        lineText(line)
                     }
                     if (isPinned) {
                         renderLine()
