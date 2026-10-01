@@ -6,20 +6,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -208,7 +212,10 @@ fun BoxScope.PhotoInfoPill(
     //  - Loop: oscillates between expanded and collapsed.
     //  - Once: collapses after the first hold and stays collapsed.
     // Either hold set to "indefinite" pins the overlay in that state.
+    // Tapping the pill while collapsed re-opens it and pauses the cycle for this
+    // photo (userPinned), so a manual peek isn't immediately snapped away.
     var expanded by remember { mutableStateOf(true) }
+    var userPinned by remember(asset?.id) { mutableStateOf(false) }
     LaunchedEffect(
         animation.mode,
         asset?.id,
@@ -217,14 +224,16 @@ fun BoxScope.PhotoInfoPill(
         animation.expandedIndefinite,
         animation.collapsedIndefinite
     ) {
+        userPinned = false
         if (!animation.enabled) {
             expanded = true
             return@LaunchedEffect
         }
         expanded = true
         if (animation.expandedIndefinite) return@LaunchedEffect
-        while (true) {
+        while (!userPinned) {
             delay(animation.expandedSeconds * 1000L)
+            if (userPinned) break
             expanded = false
             if (animation.collapsedIndefinite ||
                 animation.mode == SettingsRepository.OVERLAY_ANIM_ONCE
@@ -232,6 +241,7 @@ fun BoxScope.PhotoInfoPill(
                 return@LaunchedEffect
             }
             delay(animation.collapsedSeconds * 1000L)
+            if (userPinned) break
             expanded = true
         }
     }
@@ -243,43 +253,64 @@ fun BoxScope.PhotoInfoPill(
     )
     val effScale = style.scale * (1f + (animation.scale - 1f) * progress)
 
-    // Lines the user pinned to survive the collapsed phase. With none pinned, the
-    // whole pill hides while collapsed.
+    // Lines the user pinned to survive the collapsed phase.
     val pinnedIds = lines.filter { it.id in animation.collapsedFields }.map { it.id }.toSet()
     val nothingPinned = pinnedIds.isEmpty()
     val showAllLines = !animation.enabled || expanded
-    val pillVisible = !animation.enabled || expanded || pinnedIds.isNotEmpty()
+    // The little "info" affordance only appears while collapsed.
+    val showIcon = animation.enabled && !expanded
     val lineSpacing = if (animation.enabled) 6f * progress else 0f
+    val firstPinnedId = lines.firstOrNull { it.id in pinnedIds }?.id
 
     val pillModifier = Modifier
         .align(alignment)
         .padding(20.dp)
         .let { if (animation.marquee) it.widthIn(max = 600.dp) else it }
+        .then(
+            if (animation.enabled) Modifier.clickable {
+                expanded = !expanded
+                userPinned = true
+            } else Modifier
+        )
 
-    AnimatedVisibility(
-        visible = pillVisible,
-        enter = fadeIn(tween(400)) + scaleIn(tween(400), initialScale = 0.9f),
-        exit = fadeOut(tween(300)) + scaleOut(tween(300), targetScale = 0.9f),
-        modifier = pillModifier
-    ) {
-        Pill(style = style) {
-            Column {
+    @Composable
+    fun lineText(line: OverlayLine) {
+        Text(
+            text = line.text,
+            color = line.color,
+            fontSize = (line.baseSp * effScale).sp,
+            style = LocalTextStyle.current.copy(shadow = style.shadow),
+            maxLines = if (animation.marquee) 1 else Int.MAX_VALUE,
+            modifier = if (animation.marquee) Modifier.basicMarquee() else Modifier
+        )
+    }
+
+    Pill(style = style, modifier = pillModifier) {
+        Column {
+            if (nothingPinned) {
+                // Nothing pinned: collapsed is just the info glyph, expanded is all lines.
+                if (showAllLines) {
+                    lines.forEachIndexed { index, line ->
+                        lineText(line)
+                        if (index < lines.lastIndex) Spacer(modifier = Modifier.height(lineSpacing.dp))
+                    }
+                } else if (showIcon) {
+                    InfoGlyph(style.primary)
+                }
+            } else {
                 lines.forEachIndexed { index, line ->
+                    val isPinned = line.id in pinnedIds
                     @Composable
                     fun renderLine() {
-                        Text(
-                            text = line.text,
-                            color = line.color,
-                            fontSize = (line.baseSp * effScale).sp,
-                            style = LocalTextStyle.current.copy(shadow = style.shadow),
-                            maxLines = if (animation.marquee) 1 else Int.MAX_VALUE,
-                            modifier = if (animation.marquee) Modifier.basicMarquee() else Modifier
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (showIcon && line.id == firstPinnedId) {
+                                InfoGlyph(style.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            lineText(line)
+                        }
                     }
-
-                    // With nothing pinned the outer visibility animates the whole
-                    // pill, so lines render directly; otherwise extras animate in/out.
-                    if (nothingPinned || line.id in pinnedIds) {
+                    if (isPinned) {
                         renderLine()
                     } else {
                         AnimatedVisibility(
@@ -288,13 +319,26 @@ fun BoxScope.PhotoInfoPill(
                             exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
                         ) { renderLine() }
                     }
-
                     if (index < lines.lastIndex) {
                         Spacer(modifier = Modifier.height(lineSpacing.dp))
                     }
                 }
             }
         }
+    }
+}
+
+// Small circled "i" used as the collapsed overlay's affordance to tap for more info.
+@Composable
+private fun InfoGlyph(color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .border(1.5.dp, color, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("i", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 

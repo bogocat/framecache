@@ -162,6 +162,38 @@ fun SlideshowScreen(
             .background(Color.Black)
             .offset(x = shiftX.dp, y = shiftY.dp)
     ) {
+        // Touch zones sit on the BOTTOM layer so the info pill's / music pill's own
+        // clickables win; empty areas fall through to here. Advance / previous are
+        // only the outer ~10% edges — the middle is reserved for UI.
+        var dragTotalY by remember { mutableStateOf(0f) }
+        var boxWidth by remember { mutableStateOf(1f) }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { boxWidth = it.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = { dragTotalY = 0f },
+                        onDragEnd = {
+                            if (dragTotalY > 100f) onOpenSettings()
+                            dragTotalY = 0f
+                        },
+                        onVerticalDrag = { _, dragAmount -> dragTotalY += dragAmount }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            when {
+                                offset.x < boxWidth * 0.10f -> viewModel.previousImage()
+                                offset.x > boxWidth * 0.90f -> viewModel.nextImage()
+                            }
+                        },
+                        onLongPress = { onOpenSettings() }
+                    )
+                }
+        )
+
         val asset = state.currentAsset
 
         if (asset == null) {
@@ -299,38 +331,6 @@ fun SlideshowScreen(
                     .background(if (sleepDim) Color(0xDD000000) else Color.Black)
             )
         }
-
-        // Touch zones: left=prev, right=next, long-press=settings, swipe-down=settings
-        var dragTotalY by remember { mutableStateOf(0f) }
-        var tapX by remember { mutableStateOf(0f) }
-        var boxWidth by remember { mutableStateOf(1f) }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { boxWidth = it.width.toFloat() }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragStart = { dragTotalY = 0f },
-                        onDragEnd = {
-                            if (dragTotalY > 100f) onOpenSettings()
-                            dragTotalY = 0f
-                        },
-                        onVerticalDrag = { _, dragAmount -> dragTotalY += dragAmount }
-                    )
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { offset ->
-                            if (offset.x < boxWidth * 0.33f) {
-                                viewModel.previousImage()
-                            } else {
-                                viewModel.nextImage()
-                            }
-                        },
-                        onLongPress = { onOpenSettings() }
-                    )
-                }
-        )
 
         // Now playing pill — ABOVE touch zone so controls receive taps
         val musicActive = nowPlaying.song.id.isNotEmpty() &&
