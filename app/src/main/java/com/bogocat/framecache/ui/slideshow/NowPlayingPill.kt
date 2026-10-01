@@ -86,7 +86,9 @@ fun NowPlayingPill(
     val scope = rememberCoroutineScope()
 
     // Expand -> collapse lifecycle (same shape as the photo overlay). Starts full.
-    var expanded by remember { mutableStateOf(true) }
+    var autoExpanded by remember { mutableStateOf(true) }
+    // Manual override: double-tapping the pill flips size; null = follow the auto cycle.
+    var manualOverride by remember(nowPlaying.song.id) { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(
         config.animationEnabled,
         config.loop,
@@ -95,24 +97,25 @@ fun NowPlayingPill(
         config.collapsedSeconds
     ) {
         if (!config.animationEnabled) {
-            expanded = true
+            autoExpanded = true
             return@LaunchedEffect
         }
-        expanded = true
+        autoExpanded = true
         while (true) {
             delay(config.expandedSeconds * 1000L)
-            expanded = false
+            autoExpanded = false
             if (!config.loop) return@LaunchedEffect
             delay(config.collapsedSeconds * 1000L)
-            expanded = true
+            autoExpanded = true
         }
     }
+    val expanded = manualOverride ?: autoExpanded
     val progress by animateFloatAsState(
-        targetValue = if (!config.animationEnabled || expanded) 1f else 0f,
+        targetValue = if (expanded) 1f else 0f,
         animationSpec = tween(500),
         label = "npCollapse"
     )
-    val showFull = !config.animationEnabled || expanded
+    val showFull = expanded
     val scale = config.scale * (0.85f + 0.15f * progress)
 
     fun show(element: String, enabled: Boolean) = enabled && (showFull || element in config.collapsedElements)
@@ -132,31 +135,43 @@ fun NowPlayingPill(
                 .widthIn(max = 480.dp)
                 .height((64 * scale).dp)
                 .clip(RoundedCornerShape(config.cornerRadius.dp))
-                .background(Color.Black.copy(alpha = config.backgroundOpacity)),
+                .background(Color.Black.copy(alpha = config.backgroundOpacity))
+                // Tap = expand/collapse the pill; long-press = open the music screen.
+                // (Play/skip/close buttons are children and consume their own taps.)
+                .pointerInput(nowPlaying.song.id) {
+                    detectTapGestures(
+                        onTap = { manualOverride = !(manualOverride ?: autoExpanded) },
+                        onLongPress = { onClick() }
+                    )
+                },
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left zone: art + text (tap = open music, long-press = stop music).
             if (showArt || showTitle || showArtist) {
                 Row(
-                    modifier = Modifier
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = { onClick() },
-                                onLongPress = { musicPlayer.clearQueue() }
-                            )
-                        }
-                        .padding(horizontal = (10 * scale).dp),
+                    modifier = Modifier.padding(horizontal = (10 * scale).dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy((10 * scale).dp)
                 ) {
-                    if (showArt && nowPlaying.coverArtUrl.isNotEmpty()) {
-                        AsyncImage(
-                            model = nowPlaying.coverArtUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size((46 * scale).dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
+                    if (showArt) {
+                        if (nowPlaying.coverArtUrl.isNotEmpty()) {
+                            AsyncImage(
+                                model = nowPlaying.coverArtUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size((46 * scale).dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            // Placeholder so the collapsed pill always has a tappable body.
+                            Box(
+                                modifier = Modifier
+                                    .size((46 * scale).dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0x22FFFFFF)),
+                                contentAlignment = Alignment.Center
+                            ) { Text("\u266A", color = Color(0x99FFFFFF), fontSize = (20 * scale).sp) }
+                        }
                     }
                     if (showTitle || showArtist) {
                         Column {
@@ -231,6 +246,21 @@ fun NowPlayingPill(
                         textAlign = TextAlign.Center
                     )
                 }
+            }
+
+            // Close: stop playback and clear the queue.
+            Box(
+                modifier = Modifier
+                    .width((30 * scale).dp)
+                    .fillMaxHeight()
+                    .clickable { musicPlayer.clearQueue() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "\u2715",
+                    color = Color(0xAAFFFFFF),
+                    fontSize = (14 * scale).sp
+                )
             }
         }
     }
