@@ -64,6 +64,33 @@ interface SongDao {
     @Query("SELECT * FROM cached_songs WHERE isStarred = 1 AND (filePath IS NULL OR filePath = '') LIMIT :limit")
     suspend fun getUncachedStarred(limit: Int): List<CachedSong>
 
+    // -- Local cache pins (songs the user asked to keep offline) --
+
+    @Query("UPDATE cached_songs SET pinned = :pinned WHERE id IN (:ids)")
+    suspend fun setPinnedBatch(ids: List<String>, pinned: Boolean)
+
+    @Query("UPDATE cached_songs SET pinned = :pinned WHERE albumId = :albumId")
+    suspend fun setPinnedForAlbum(albumId: String, pinned: Boolean)
+
+    @Query("UPDATE cached_songs SET pinned = :pinned WHERE artist = :artist")
+    suspend fun setPinnedForArtist(artist: String, pinned: Boolean)
+
+    @Query("SELECT * FROM cached_songs WHERE pinned = 1 AND (filePath IS NULL OR filePath = '') LIMIT :limit")
+    suspend fun getUncachedPinned(limit: Int): List<CachedSong>
+
+    @Query("SELECT id FROM cached_songs WHERE pinned = 1")
+    suspend fun getPinnedIds(): List<String>
+
+    @Query("""
+        SELECT albumId, album, artist, MAX(coverArt) AS coverArt, MAX(year) AS year,
+               COUNT(*) AS songCount,
+               SUM(CASE WHEN pinned = 1 THEN 1 ELSE 0 END) AS pinnedCount,
+               SUM(CASE WHEN filePath IS NOT NULL AND filePath != '' THEN 1 ELSE 0 END) AS cachedCount
+        FROM cached_songs WHERE artist = :artist
+        GROUP BY albumId ORDER BY year ASC, album ASC
+    """)
+    suspend fun getAlbumsByArtist(artist: String): List<AlbumWithCounts>
+
     @Query("UPDATE cached_songs SET filePath = :path, fileSize = :size WHERE id = :id")
     suspend fun updateFilePath(id: String, path: String, size: Long)
 
@@ -167,4 +194,15 @@ data class AlbumSummary(
 data class AlbumSongCount(
     val albumId: String,
     val count: Int
+)
+
+data class AlbumWithCounts(
+    val albumId: String,
+    val album: String,
+    val artist: String,
+    val coverArt: String?,
+    val year: Int?,
+    val songCount: Int,
+    val pinnedCount: Int,
+    val cachedCount: Int
 )

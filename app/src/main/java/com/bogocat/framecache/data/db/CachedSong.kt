@@ -22,7 +22,8 @@ data class CachedSong(
     val playCount: Int = 0,
     val lastPlayed: Long? = null,
     val fileSize: Long = 0,
-    val isStarred: Boolean = false
+    val isStarred: Boolean = false,
+    val pinned: Boolean = false
 )
 
 @Entity(tableName = "playlist_songs", primaryKeys = ["playlistId", "songId"])

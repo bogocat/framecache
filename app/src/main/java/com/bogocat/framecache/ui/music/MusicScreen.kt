@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +28,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,9 +49,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.bogocat.framecache.data.db.AlbumWithCounts
 import com.bogocat.framecache.data.db.CachedPlaylist
 import com.bogocat.framecache.data.db.CachedSong
 import com.bogocat.framecache.data.db.SongDao
@@ -299,7 +303,8 @@ private sealed class BrowseRoute {
     data object PlaylistList : BrowseRoute()
     data class PlaylistDetail(val id: String, val name: String) : BrowseRoute()
     data object ArtistList : BrowseRoute()
-    data class ArtistDetail(val name: String) : BrowseRoute()
+    data class ArtistAlbums(val name: String) : BrowseRoute()
+    data class AlbumDetail(val artist: String, val albumId: String, val album: String) : BrowseRoute()
     data object SongList : BrowseRoute()
     data object Favorites : BrowseRoute()
     data class Search(val query: String) : BrowseRoute()
@@ -323,9 +328,10 @@ private fun BrowseTab(
             ) {
                 Text("< Back", color = accentColor, fontSize = 14.sp,
                     modifier = Modifier.clickable {
-                        route = when (route) {
+                        route = when (val r = route) {
                             is BrowseRoute.PlaylistDetail -> BrowseRoute.PlaylistList
-                            is BrowseRoute.ArtistDetail -> BrowseRoute.ArtistList
+                            is BrowseRoute.ArtistAlbums -> BrowseRoute.ArtistList
+                            is BrowseRoute.AlbumDetail -> BrowseRoute.ArtistAlbums(r.artist)
                             else -> BrowseRoute.Home
                         }
                     }.padding(8.dp))
@@ -334,7 +340,8 @@ private fun BrowseTab(
                     is BrowseRoute.PlaylistList -> "Playlists"
                     is BrowseRoute.PlaylistDetail -> (route as BrowseRoute.PlaylistDetail).name
                     is BrowseRoute.ArtistList -> "Artists"
-                    is BrowseRoute.ArtistDetail -> (route as BrowseRoute.ArtistDetail).name
+                    is BrowseRoute.ArtistAlbums -> (route as BrowseRoute.ArtistAlbums).name
+                    is BrowseRoute.AlbumDetail -> (route as BrowseRoute.AlbumDetail).album
                     is BrowseRoute.SongList -> "All Songs"
                     is BrowseRoute.Search -> "Search: ${(route as BrowseRoute.Search).query}"
                     else -> ""
@@ -374,34 +381,46 @@ private fun BrowseTab(
                 val detail = route as BrowseRoute.PlaylistDetail
                 SongListView(
                     loadSongs = { songDao.getSongsForPlaylist(detail.id) },
-                    source = detail.name, musicPlayer = musicPlayer, cachedOnly = cachedOnly
+                    source = detail.name, musicPlayer = musicPlayer, cachedOnly = cachedOnly,
+                    songDao = songDao
                 )
             }
             BrowseRoute.ArtistList -> ArtistListView(
                 songDao = songDao, cachedOnly = cachedOnly,
-                onArtist = { route = BrowseRoute.ArtistDetail(it) },
+                onArtist = { route = BrowseRoute.ArtistAlbums(it) },
                 musicPlayer = musicPlayer
             )
-            is BrowseRoute.ArtistDetail -> {
-                val detail = route as BrowseRoute.ArtistDetail
+            is BrowseRoute.ArtistAlbums -> {
+                val artist = (route as BrowseRoute.ArtistAlbums).name
+                ArtistAlbumsView(
+                    artist = artist, songDao = songDao, musicPlayer = musicPlayer,
+                    onAlbum = { route = BrowseRoute.AlbumDetail(artist, it.albumId, it.album) }
+                )
+            }
+            is BrowseRoute.AlbumDetail -> {
+                val detail = route as BrowseRoute.AlbumDetail
                 SongListView(
-                    loadSongs = { songDao.getSongsByArtist(detail.name) },
-                    source = detail.name, musicPlayer = musicPlayer, cachedOnly = cachedOnly
+                    loadSongs = { songDao.getSongsByAlbum(detail.albumId) },
+                    source = detail.album, musicPlayer = musicPlayer, cachedOnly = cachedOnly,
+                    songDao = songDao
                 )
             }
             BrowseRoute.SongList -> SongListView(
                 loadSongs = { if (cachedOnly) songDao.getAllCachedSongs() else songDao.getAllSongs() },
-                source = "All Songs", musicPlayer = musicPlayer, cachedOnly = cachedOnly
+                source = "All Songs", musicPlayer = musicPlayer, cachedOnly = cachedOnly,
+                songDao = songDao
             )
             BrowseRoute.Favorites -> SongListView(
                 loadSongs = { songDao.getStarredSongs() },
-                source = "Favorites", musicPlayer = musicPlayer, cachedOnly = cachedOnly
+                source = "Favorites", musicPlayer = musicPlayer, cachedOnly = cachedOnly,
+                songDao = songDao
             )
             is BrowseRoute.Search -> {
                 val q = (route as BrowseRoute.Search).query
                 SongListView(
                     loadSongs = { songDao.search(q) },
-                    source = "Search: $q", musicPlayer = musicPlayer, cachedOnly = cachedOnly
+                    source = "Search: $q", musicPlayer = musicPlayer, cachedOnly = cachedOnly,
+                    songDao = songDao
                 )
             }
         }
@@ -585,25 +604,46 @@ private fun ArtistListView(
     }
 }
 
-// ─── Song List (reusable for playlist detail, artist detail, all songs) ───
+// ─── Song List (reusable for playlist/album/artist/all songs) ───
 
 @Composable
 private fun SongListView(
     loadSongs: suspend () -> List<CachedSong>,
-    source: String, musicPlayer: MusicPlayer, cachedOnly: Boolean
+    source: String, musicPlayer: MusicPlayer, cachedOnly: Boolean, songDao: SongDao
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var songs by remember { mutableStateOf<List<CachedSong>>(emptyList()) }
-    LaunchedEffect(source, cachedOnly) {
+    var pendingBulk by remember { mutableStateOf<BulkCache?>(null) }
+
+    suspend fun reload() {
         val all = loadSongs()
         songs = if (cachedOnly) all.filter { it.filePath != null && it.filePath.isNotEmpty() } else all
     }
+    LaunchedEffect(source, cachedOnly) { reload() }
+
+    fun setPinned(ids: List<String>, pinned: Boolean) {
+        if (ids.isEmpty()) return
+        scope.launch {
+            ids.chunked(500).forEach { songDao.setPinnedBatch(it, pinned) }
+            SyncScheduler.triggerMusicSync(context)
+            reload()
+        }
+    }
+
+    val cachedCount = songs.count { it.filePath != null && it.filePath.isNotEmpty() }
+    val bulkState = when {
+        songs.isNotEmpty() && songs.all { it.pinned } -> CacheState.Cached
+        songs.any { it.pinned || (it.filePath != null && it.filePath.isNotEmpty()) } -> CacheState.Pending
+        else -> CacheState.None
+    }
 
     Column {
-        // Play / Shuffle bar
+        // Play / Shuffle / Queue + bulk cache toggle
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(Color(0x22FFFFFF))
@@ -624,19 +664,28 @@ private fun SongListView(
                     } }.padding(horizontal = 12.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) { Text("+ Queue", color = dimText, fontSize = 13.sp) }
+            CacheButton(bulkState) {
+                if (bulkState == CacheState.None) {
+                    val ids = songs.map { it.id }
+                    if (ids.size > BULK_CACHE_CONFIRM_THRESHOLD) {
+                        pendingBulk = BulkCache(source, ids.size) { setPinned(ids, true) }
+                    } else setPinned(ids, true)
+                } else {
+                    setPinned(songs.map { it.id }, false)
+                }
+            }
         }
 
-        Text("${songs.size} songs", color = dimText, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+        Text("${songs.size} songs · $cachedCount cached", color = dimText, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             items(songs.size) { index ->
                 val song = songs[index]
-                val hasCached = song.filePath != null && song.filePath.isNotEmpty()
                 Row(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
                         .clickable {
                             scope.launch { musicPlayer.playCachedQueue(songs, source = source) }
-                        }.padding(horizontal = 12.dp, vertical = 8.dp),
+                        }.padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text("${index + 1}", color = dimText, fontSize = 12.sp, modifier = Modifier.width(24.dp))
@@ -644,12 +693,167 @@ private fun SongListView(
                         Text(song.title, color = Color(0xCCFFFFFF), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${song.artist} — ${song.album}", color = dimText, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    if (hasCached) Text("\u2713", color = greenCache, fontSize = 11.sp)
                     Text(formatTime(song.duration * 1000L), color = dimText, fontSize = 11.sp)
+                    CacheButton(songCacheState(song), size = 34.dp) {
+                        setPinned(listOf(song.id), !song.pinned)
+                    }
                 }
             }
         }
     }
+    BulkCacheDialog(pendingBulk) { pendingBulk = null }
+}
+
+// ─── Artist albums ───
+
+@Composable
+private fun ArtistAlbumsView(
+    artist: String, songDao: SongDao, musicPlayer: MusicPlayer,
+    onAlbum: (AlbumWithCounts) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var albums by remember { mutableStateOf<List<AlbumWithCounts>>(emptyList()) }
+    var reloadKey by remember { mutableStateOf(0) }
+    var pendingBulk by remember { mutableStateOf<BulkCache?>(null) }
+
+    LaunchedEffect(artist, reloadKey) { albums = songDao.getAlbumsByArtist(artist) }
+
+    val totalSongs = albums.sumOf { it.songCount }
+    val cachedSongs = albums.sumOf { it.cachedCount }
+    val pinnedSongs = albums.sumOf { it.pinnedCount }
+    val artistState = when {
+        totalSongs > 0 && cachedSongs == totalSongs -> CacheState.Cached
+        pinnedSongs > 0 || cachedSongs > 0 -> CacheState.Pending
+        else -> CacheState.None
+    }
+
+    fun pinAlbum(album: AlbumWithCounts, pinned: Boolean) {
+        scope.launch {
+            songDao.setPinnedForAlbum(album.albumId, pinned)
+            SyncScheduler.triggerMusicSync(context)
+            reloadKey++
+        }
+    }
+    fun pinArtist(pinned: Boolean) {
+        scope.launch {
+            songDao.setPinnedForArtist(artist, pinned)
+            SyncScheduler.triggerMusicSync(context)
+            reloadKey++
+        }
+    }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(Color(0x22FFFFFF))
+                    .clickable { scope.launch { musicPlayer.playCachedQueue(songDao.getSongsByArtist(artist), source = artist) } }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) { Text("Play All", color = Color.White, fontSize = 13.sp) }
+            Box(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(Color(0x22FFFFFF))
+                    .clickable { scope.launch { musicPlayer.playCachedQueue(songDao.getSongsByArtist(artist), source = artist, shuffle = true) } }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) { Text("Shuffle", color = accentColor, fontSize = 13.sp) }
+            CacheButton(artistState) {
+                if (artistState == CacheState.None) {
+                    if (totalSongs > BULK_CACHE_CONFIRM_THRESHOLD) {
+                        pendingBulk = BulkCache(artist, totalSongs) { pinArtist(true) }
+                    } else pinArtist(true)
+                } else pinArtist(false)
+            }
+        }
+
+        Text(
+            "${albums.size} albums · $cachedSongs/$totalSongs cached",
+            color = dimText, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            items(albums.size) { index ->
+                val album = albums[index]
+                val state = albumCacheState(album)
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(rowBg)
+                        .clickable { onAlbum(album) }
+                        .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(album.album, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val meta = buildList {
+                            album.year?.let { add(it.toString()) }
+                            add("${album.songCount} songs")
+                            if (album.cachedCount > 0) add("${album.cachedCount} cached")
+                        }
+                        Text(meta.joinToString(" · "), color = dimText, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    CacheButton(state, size = 36.dp) {
+                        if (state == CacheState.None) {
+                            if (album.songCount > BULK_CACHE_CONFIRM_THRESHOLD) {
+                                pendingBulk = BulkCache(album.album, album.songCount) { pinAlbum(album, true) }
+                            } else pinAlbum(album, true)
+                        } else pinAlbum(album, false)
+                    }
+                }
+            }
+        }
+    }
+    BulkCacheDialog(pendingBulk) { pendingBulk = null }
+}
+
+// ─── Cache affordances ───
+
+private const val BULK_CACHE_CONFIRM_THRESHOLD = 50
+
+private enum class CacheState { Cached, Pending, None }
+
+private fun songCacheState(song: CachedSong): CacheState = when {
+    song.filePath != null && song.filePath.isNotEmpty() -> CacheState.Cached
+    song.pinned -> CacheState.Pending
+    else -> CacheState.None
+}
+
+private fun albumCacheState(album: AlbumWithCounts): CacheState = when {
+    album.songCount > 0 && album.cachedCount == album.songCount -> CacheState.Cached
+    album.pinnedCount > 0 || album.cachedCount > 0 -> CacheState.Pending
+    else -> CacheState.None
+}
+
+@Composable
+private fun CacheButton(state: CacheState, size: Dp = 40.dp, onClick: () -> Unit) {
+    val glyph: String
+    val fg: Color
+    val bg: Color
+    when (state) {
+        CacheState.Cached -> { glyph = "\u2713"; fg = greenCache; bg = Color(0x3369F0AE) }
+        CacheState.Pending -> { glyph = "\u2193"; fg = Color(0xFFFFAB40); bg = Color(0x33FFAB40) }
+        CacheState.None -> { glyph = "\u2193"; fg = dimText; bg = Color(0x22FFFFFF) }
+    }
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape).background(bg).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Text(glyph, color = fg, fontSize = 15.sp) }
+}
+
+private data class BulkCache(val label: String, val count: Int, val run: () -> Unit)
+
+@Composable
+private fun BulkCacheDialog(action: BulkCache?, onDismiss: () -> Unit) {
+    if (action == null) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Cache ${action.count} songs?") },
+        text = { Text("Download ${action.count} songs from \"${action.label}\" for offline playback?") },
+        confirmButton = { TextButton(onClick = { action.run(); onDismiss() }) { Text("Cache") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 private fun CachedSong.toSong() = com.bogocat.framecache.api.navidrome.Song(

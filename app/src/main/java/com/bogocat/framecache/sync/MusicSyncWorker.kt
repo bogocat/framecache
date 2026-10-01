@@ -32,6 +32,7 @@ class MusicSyncWorker @AssistedInject constructor(
         const val TAG = "MusicSync"
         const val ALBUM_PAGE_SIZE = 500
         const val DOWNLOAD_BATCH_SIZE = 10
+        const val MAX_DOWNLOADS_PER_RUN = 100
     }
 
     override suspend fun doWork(): Result {
@@ -200,7 +201,8 @@ class MusicSyncWorker @AssistedInject constructor(
      * local files are removed, so the song stays available for streaming.
      */
     private suspend fun pruneUnwantedFiles(syncIds: Set<String>, syncFavorites: Boolean) {
-        if (syncIds.isEmpty() && !syncFavorites) {
+        val pinnedIds = songDao.getPinnedIds().toSet()
+        if (syncIds.isEmpty() && !syncFavorites && pinnedIds.isEmpty()) {
             Log.d(TAG, "No cache sources selected — keeping existing audio")
             return
         }
@@ -208,6 +210,7 @@ class MusicSyncWorker @AssistedInject constructor(
         val keep = mutableSetOf<String>()
         if (syncIds.isNotEmpty()) keep += songDao.getSongIdsForPlaylists(syncIds.toList())
         if (syncFavorites) keep += songDao.getStarredSongs().map { it.id }
+        keep += pinnedIds
 
         var removed = 0
         for (song in songDao.getAllCachedWithPath()) {
@@ -221,21 +224,37 @@ class MusicSyncWorker @AssistedInject constructor(
     }
 
     private suspend fun downloadUncachedSongs(syncIds: Set<String>, syncFavorites: Boolean) {
-        val uncached = mutableListOf<CachedSong>()
+        val attempted = mutableSetOf<String>()
+        var downloaded = 0
+
+        // Explicitly pinned songs are user intent, so drain them (bounded per run)
+        // rather than trickling 10 per sync — caching an album should actually finish.
+        while (downloaded < MAX_DOWNLOADS_PER_RUN) {
+            val batch = songDao.getUncachedPinned(DOWNLOAD_BATCH_SIZE)
+                .filter { it.id !in attempted }
+                .take(MAX_DOWNLOADS_PER_RUN - downloaded)
+            if (batch.isEmpty()) break
+            Log.i(TAG, "Downloading ${batch.size} pinned song(s)")
+            for (song in batch) {
+                attempted += song.id
+                cacheManager.downloadSong(song.id)
+                if (song.coverArt != null && song.coverPath == null) {
+                    cacheManager.downloadCover(song.id, song.coverArt)
+                }
+                downloaded++
+            }
+        }
+
+        // Playlist / favourite songs: one batch each to bound the run.
+        val other = mutableListOf<CachedSong>()
         if (syncIds.isNotEmpty()) {
-            uncached += songDao.getUncachedSongsForPlaylists(syncIds.toList(), DOWNLOAD_BATCH_SIZE)
+            other += songDao.getUncachedSongsForPlaylists(syncIds.toList(), DOWNLOAD_BATCH_SIZE)
         }
-        if (syncFavorites && uncached.size < DOWNLOAD_BATCH_SIZE) {
-            uncached += songDao.getUncachedStarred(DOWNLOAD_BATCH_SIZE - uncached.size)
+        if (syncFavorites) {
+            other += songDao.getUncachedStarred(DOWNLOAD_BATCH_SIZE)
         }
-
-        val batch = uncached.distinctBy { it.id }
-        if (batch.isEmpty()) {
-            Log.d(TAG, "All selected songs cached")
-            return
-        }
-
-        Log.i(TAG, "Downloading ${batch.size} songs")
+        val batch = other.distinctBy { it.id }.filter { it.id !in attempted }
+        if (batch.isNotEmpty()) Log.i(TAG, "Downloading ${batch.size} selected song(s)")
         for (song in batch) {
             cacheManager.downloadSong(song.id)
             if (song.coverArt != null && song.coverPath == null) {
