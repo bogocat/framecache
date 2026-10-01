@@ -684,7 +684,7 @@ private fun SongListView(
                 Row(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
                         .clickable {
-                            scope.launch { musicPlayer.playCachedQueue(songs, source = source) }
+                            scope.launch { musicPlayer.playCachedQueue(songs, startIndex = index, source = source) }
                         }.padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {

@@ -224,8 +224,13 @@ class MusicPlayer @Inject constructor(
     /**
      * Play from cached songs. Converts CachedSong → Song for the queue.
      */
-    suspend fun playCachedQueue(songs: List<CachedSong>, source: String = "", shuffle: Boolean = false) {
-        playQueue(songs.map { it.toSong() }, source = source, shuffle = shuffle)
+    suspend fun playCachedQueue(
+        songs: List<CachedSong>,
+        startIndex: Int = 0,
+        source: String = "",
+        shuffle: Boolean = false
+    ) {
+        playQueue(songs.map { it.toSong() }, startIndex = startIndex, source = source, shuffle = shuffle)
     }
 
     /**
