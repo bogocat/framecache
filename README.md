@@ -21,7 +21,7 @@ FrameCache: Device app ←—reads local disk—→ [cached JPEGs + Room DB]
 
 - **Offline-first** — photos cached locally on the device, slideshow never touches the network
 - **Background sync** — configurable interval; downloads new photos when WiFi is available
-- **Weighted random** — every photo shown before any repeats
+- **Least-recently-shown rotation** — every photo shown before any repeats, and newly added photos slot into the rotation immediately instead of monopolising it
 - **Orientation filter** — show all photos, only those matching the screen orientation, or matching + opposite-orientation shown two-up
 - **Ken Burns effect** — configurable slow zoom/pan animation
 - **Crossfade transitions** — smooth blending between photos

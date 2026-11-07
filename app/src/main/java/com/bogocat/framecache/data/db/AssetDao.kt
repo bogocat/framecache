@@ -6,40 +6,51 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 
+/**
+ * Playback order is least-recently-shown: `ORDER BY lastDisplayed ASC, RANDOM()`.
+ *
+ * SQLite sorts NULL first, so never-shown assets (newly added album photos) surface
+ * immediately and then go to the back of the queue like everything else.
+ *
+ * Do NOT go back to `ORDER BY displayCount ASC`: that counter is never reset, so a
+ * batch of newly added photos enters at 0 and the greedy min-count keeps re-picking
+ * only that batch until it catches up with the accumulated count of every older photo
+ * — thousands of advances, i.e. days of the frame showing nothing but the new photos.
+ */
 @Dao
 interface AssetDao {
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextRandom(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND id != :excludeId ORDER BY lastDisplayed ASC, dateTaken ASC LIMIT 1")
     suspend fun getNextChronological(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextFavorite(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND width > height AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextFavoriteLandscape(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND isFavorite = 1 AND height > width AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextFavoritePortrait(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY lastDisplayed ASC, dateTaken ASC LIMIT 1")
     suspend fun getNextChronologicalLandscape(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, dateTaken ASC LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY lastDisplayed ASC, dateTaken ASC LIMIT 1")
     suspend fun getNextChronologicalPortrait(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextLandscape(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextPortrait(excludeId: String = ""): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND width > height AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextLandscapeNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
 
-    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY displayCount ASC, RANDOM() LIMIT 1")
+    @Query("SELECT * FROM cached_assets WHERE filePath IS NOT NULL AND height > width AND id != :excludeId AND dateTaken BETWEEN :minDate AND :maxDate ORDER BY lastDisplayed ASC, RANDOM() LIMIT 1")
     suspend fun getNextPortraitNearDate(excludeId: String, minDate: Long, maxDate: Long): CachedAsset?
 
     @Query("UPDATE cached_assets SET displayCount = displayCount + 1, lastDisplayed = :now WHERE id = :id")
