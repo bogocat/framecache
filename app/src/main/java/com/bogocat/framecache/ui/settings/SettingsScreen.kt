@@ -120,12 +120,16 @@ fun SettingsScreen(
     val showPeople by settings.showPeople.collectAsState(initial = false)
     val showCamera by settings.showCamera.collectAsState(initial = false)
     val overlayScale by settings.overlayScale.collectAsState(initial = 100)
-    val overlayTextColor by settings.overlayTextColor.collectAsState(initial = "light")
-    val overlayBackground by settings.overlayBackground.collectAsState(initial = true)
-    val overlayBackgroundOpacity by settings.overlayBackgroundOpacity.collectAsState(initial = 53)
     val overlayClockPosition by settings.overlayClockPosition.collectAsState(initial = SettingsRepository.OVERLAY_POS_TOP_START)
     val overlayInfoPosition by settings.overlayInfoPosition.collectAsState(initial = SettingsRepository.OVERLAY_POS_BOTTOM_START)
-    val overlayCornerRadius by settings.overlayCornerRadius.collectAsState(initial = 16)
+    val clockTextColor by settings.clockTextColor.collectAsState(initial = SettingsRepository.TEXT_COLOR_LIGHT)
+    val clockBackground by settings.clockBackground.collectAsState(initial = SettingsRepository.BACKGROUND_AUTO)
+    val clockBackgroundOpacity by settings.clockBackgroundOpacity.collectAsState(initial = 53)
+    val clockCornerRadius by settings.clockCornerRadius.collectAsState(initial = 16)
+    val infoTextColor by settings.infoTextColor.collectAsState(initial = SettingsRepository.TEXT_COLOR_LIGHT)
+    val infoBackground by settings.infoBackground.collectAsState(initial = SettingsRepository.BACKGROUND_AUTO)
+    val infoBackgroundOpacity by settings.infoBackgroundOpacity.collectAsState(initial = 53)
+    val infoCornerRadius by settings.infoCornerRadius.collectAsState(initial = 16)
     val clockScale by settings.clockScale.collectAsState(initial = 100)
     val clockFont by settings.clockFont.collectAsState(initial = SettingsRepository.CLOCK_FONT_SANS)
     val clockWeight by settings.clockWeight.collectAsState(initial = SettingsRepository.CLOCK_WEIGHT_LIGHT)
@@ -146,12 +150,21 @@ fun SettingsScreen(
     val deviceConfig = LocalConfiguration.current
     val deviceWidthDp = deviceConfig.screenWidthDp
     val deviceHeightDp = deviceConfig.screenHeightDp
-    val previewStyle = OverlayStyle(
-        scale = 1f, // per-overlay scale is passed separately to each preview
-        light = overlayTextColor != "dark",
-        showBackground = overlayBackground,
-        backgroundOpacity = overlayBackgroundOpacity / 100f,
-        cornerRadius = overlayCornerRadius
+    // Auto-contrast cannot be resolved without a photo, so the previews draw the
+    // light-text case and the caption says what auto is doing.
+    val clockPreviewStyle = OverlayStyle(
+        scale = 1f, // the clock preview applies its own scale
+        light = clockTextColor != SettingsRepository.TEXT_COLOR_DARK,
+        background = clockBackground,
+        backgroundOpacity = clockBackgroundOpacity / 100f,
+        cornerRadius = clockCornerRadius
+    )
+    val infoPreviewStyle = OverlayStyle(
+        scale = 1f, // the info preview applies its own scale
+        light = infoTextColor != SettingsRepository.TEXT_COLOR_DARK,
+        background = infoBackground,
+        backgroundOpacity = infoBackgroundOpacity / 100f,
+        cornerRadius = infoCornerRadius
     )
     val previewClockStyle = ClockStyle(
         scale = clockScale / 100f,
@@ -661,7 +674,7 @@ fun SettingsScreen(
                     deviceWidthDp = deviceWidthDp,
                     deviceHeightDp = deviceHeightDp,
                     alignment = overlayAlignment(overlayClockPosition),
-                    style = previewStyle,
+                    style = clockPreviewStyle,
                     clock = previewClockStyle,
                     clockFormat = clockFormat,
                     dateFormat = dateFormat,
@@ -671,7 +684,10 @@ fun SettingsScreen(
                     title = "Preview",
                     detail = clockSizeLabel(clockScale) + " \u00B7 " + clockFontLabel(clockFont) +
                         " " + clockWeight.replaceFirstChar { it.uppercaseChar() },
-                    note = "Pill size and position relative to the whole frame."
+                    note = "Pill size and position relative to the whole frame." +
+                        if (clockTextColor == SettingsRepository.TEXT_COLOR_AUTO)
+                            "  Auto colour: white or black, chosen per photo."
+                        else ""
                 )
             }
             OverlayPositionRow("Position", overlayClockPosition) {
@@ -705,7 +721,7 @@ fun SettingsScreen(
             SliderSetting(
                 "Size",
                 clockScale.toFloat(),
-                50f..400f,
+                50f..800f,
                 "",
                 format = { clockSizeLabel(it.roundToInt()) }
             ) {
@@ -714,13 +730,43 @@ fun SettingsScreen(
             SliderSetting(
                 "Letter Spacing",
                 clockLetterSpacing.toFloat(),
-                -20f..80f,
+                -100f..400f,
                 "",
                 format = { "%.1f sp".format(it / 10f) }
             ) {
                 scope.launch { settings.save(SettingsRepository.CLOCK_LETTER_SPACING, it.roundToInt()) }
             }
-            HintText("Size, font and spacing apply to both the clock and the date under it.")
+            OverlayChoiceRow(
+                "Text Color",
+                listOf(
+                    SettingsRepository.TEXT_COLOR_LIGHT to "Light",
+                    SettingsRepository.TEXT_COLOR_DARK to "Dark",
+                    SettingsRepository.TEXT_COLOR_AUTO to "Auto"
+                ),
+                clockTextColor
+            ) { scope.launch { settings.save(SettingsRepository.CLOCK_TEXT_COLOR, it) } }
+            OverlayChoiceRow(
+                "Background",
+                listOf(
+                    SettingsRepository.BACKGROUND_NONE to "None",
+                    SettingsRepository.BACKGROUND_DARK to "Dark",
+                    SettingsRepository.BACKGROUND_LIGHT to "Light",
+                    SettingsRepository.BACKGROUND_AUTO to "Auto"
+                ),
+                clockBackground
+            ) { scope.launch { settings.save(SettingsRepository.CLOCK_BACKGROUND, it) } }
+            if (clockBackground != SettingsRepository.BACKGROUND_NONE) {
+                SliderSetting("Background Opacity", clockBackgroundOpacity.toFloat(), 0f..100f, "%") {
+                    scope.launch { settings.save(SettingsRepository.CLOCK_BACKGROUND_OPACITY, it.roundToInt()) }
+                }
+                SliderSetting("Corner Radius", clockCornerRadius.toFloat(), 0f..48f, "dp") {
+                    scope.launch { settings.save(SettingsRepository.CLOCK_CORNER_RADIUS, it.roundToInt()) }
+                }
+            }
+            HintText(
+                "Size, font and spacing apply to both the clock and the date under it. " +
+                    "\"Auto\" text colour picks white or black from the photo behind the pill."
+            )
         } else {
             HintText("Nothing to style while the clock and its date are both hidden.")
         }
@@ -769,7 +815,7 @@ fun SettingsScreen(
                     deviceWidthDp = deviceWidthDp,
                     deviceHeightDp = deviceHeightDp,
                     alignment = overlayAlignment(overlayInfoPosition),
-                    style = previewStyle,
+                    style = infoPreviewStyle,
                     scale = overlayScale / 100f,
                     animation = previewAnimation,
                     lines = previewLines(
@@ -787,10 +833,13 @@ fun SettingsScreen(
                     title = "Preview",
                     detail = infoScaleLabel(overlayScale) + " \u00B7 date line " +
                         "${(15f * overlayScale / 100f).roundToInt()} sp",
-                    note = if (previewAnimation.enabled)
+                    note = (if (previewAnimation.enabled)
                         "Expanded state shown \u2014 the largest the pill gets."
                     else
-                        "Each line scaled from its own default size."
+                        "Each line scaled from its own default size.") +
+                        if (infoTextColor == SettingsRepository.TEXT_COLOR_AUTO)
+                            "  Auto colour: white or black, chosen per photo."
+                        else ""
                 )
             }
             OverlayPositionRow("Position", overlayInfoPosition) {
@@ -799,28 +848,37 @@ fun SettingsScreen(
             SliderSetting(
                 "Size",
                 overlayScale.toFloat(),
-                50f..400f,
+                50f..800f,
                 "",
                 format = { infoScaleLabel(it.roundToInt()) }
             ) { scope.launch { settings.save(SettingsRepository.OVERLAY_SCALE, it.roundToInt()) } }
             OverlayChoiceRow(
                 "Text Color",
-                listOf("light" to "Light", "dark" to "Dark"),
-                overlayTextColor
-            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_COLOR, it) } }
+                listOf(
+                    SettingsRepository.TEXT_COLOR_LIGHT to "Light",
+                    SettingsRepository.TEXT_COLOR_DARK to "Dark",
+                    SettingsRepository.TEXT_COLOR_AUTO to "Auto"
+                ),
+                infoTextColor
+            ) { scope.launch { settings.save(SettingsRepository.INFO_TEXT_COLOR, it) } }
             OverlayChoiceRow(
                 "Background",
-                listOf("pill" to "Pill", "none" to "None"),
-                if (overlayBackground) "pill" else "none"
-            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND, it == "pill") } }
+                listOf(
+                    SettingsRepository.BACKGROUND_NONE to "None",
+                    SettingsRepository.BACKGROUND_DARK to "Dark",
+                    SettingsRepository.BACKGROUND_LIGHT to "Light",
+                    SettingsRepository.BACKGROUND_AUTO to "Auto"
+                ),
+                infoBackground
+            ) { scope.launch { settings.save(SettingsRepository.INFO_BACKGROUND, it) } }
 
-            if (overlayBackground) {
-                SliderSetting("Background Opacity", overlayBackgroundOpacity.toFloat(), 0f..100f, "%") {
-                    scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND_OPACITY, it.roundToInt()) }
+            if (infoBackground != SettingsRepository.BACKGROUND_NONE) {
+                SliderSetting("Background Opacity", infoBackgroundOpacity.toFloat(), 0f..100f, "%") {
+                    scope.launch { settings.save(SettingsRepository.INFO_BACKGROUND_OPACITY, it.roundToInt()) }
                 }
-            }
-            SliderSetting("Corner Radius", overlayCornerRadius.toFloat(), 0f..32f, "dp") {
-                scope.launch { settings.save(SettingsRepository.OVERLAY_CORNER_RADIUS, it.roundToInt()) }
+                SliderSetting("Corner Radius", infoCornerRadius.toFloat(), 0f..48f, "dp") {
+                    scope.launch { settings.save(SettingsRepository.INFO_CORNER_RADIUS, it.roundToInt()) }
+                }
             }
             SubHeading("Motion")
 

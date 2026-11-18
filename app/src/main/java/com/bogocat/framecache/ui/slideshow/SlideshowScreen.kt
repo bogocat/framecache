@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.blur
@@ -79,12 +80,16 @@ fun SlideshowScreen(
     val showPersonAge by viewModel.showPersonAge.collectAsState()
     val clockFormat by viewModel.clockFormat.collectAsState()
     val overlayScale by viewModel.overlayScale.collectAsState()
-    val overlayTextColor by viewModel.overlayTextColor.collectAsState()
-    val overlayBackground by viewModel.overlayBackground.collectAsState()
-    val overlayBackgroundOpacity by viewModel.overlayBackgroundOpacity.collectAsState()
     val overlayClockPosition by viewModel.overlayClockPosition.collectAsState()
     val overlayInfoPosition by viewModel.overlayInfoPosition.collectAsState()
-    val overlayCornerRadius by viewModel.overlayCornerRadius.collectAsState()
+    val clockTextColor by viewModel.clockTextColor.collectAsState()
+    val clockBackground by viewModel.clockBackground.collectAsState()
+    val clockBackgroundOpacity by viewModel.clockBackgroundOpacity.collectAsState()
+    val clockCornerRadius by viewModel.clockCornerRadius.collectAsState()
+    val infoTextColor by viewModel.infoTextColor.collectAsState()
+    val infoBackground by viewModel.infoBackground.collectAsState()
+    val infoBackgroundOpacity by viewModel.infoBackgroundOpacity.collectAsState()
+    val infoCornerRadius by viewModel.infoCornerRadius.collectAsState()
     val clockScale by viewModel.clockScale.collectAsState()
     val clockFont by viewModel.clockFont.collectAsState()
     val clockWeight by viewModel.clockWeight.collectAsState()
@@ -119,15 +124,40 @@ fun SlideshowScreen(
     val isLandscapeDevice = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     LaunchedEffect(isLandscapeDevice) { viewModel.setDeviceLandscape(isLandscapeDevice) }
 
-    // Overlay presentation, assembled from the user's style options.
+    val clockAlignment = remember(overlayClockPosition) { overlayAlignment(overlayClockPosition) }
+    val infoAlignment = remember(overlayInfoPosition) { overlayAlignment(overlayInfoPosition) }
+
+    // Brightness of the photo under each corner, for auto-contrast text. Sampled once
+    // per photo from the cached file, off the main thread; null until it arrives (and
+    // for photos that cannot be read), which keeps white text as the fallback.
+    val context = LocalContext.current
+    var luminance by remember { mutableStateOf<CornerLuminance?>(null) }
+    val currentAssetId = state.currentAsset?.id
+    LaunchedEffect(currentAssetId) {
+        luminance = null
+        luminance = sampleCornerLuminance(context, state.currentAsset?.filePath)
+    }
+
+    // Overlay presentation, assembled from the user's style options — one style per
+    // pill, since each resolves its own colour and background.
+    val infoLuminance = luminance?.forAlignment(infoAlignment)
+    val clockLuminance = luminance?.forAlignment(clockAlignment)
+    val clockLight = resolveLightText(clockTextColor, clockLuminance, clockBackground, clockBackgroundOpacity / 100f)
+    val infoLight = resolveLightText(infoTextColor, infoLuminance, infoBackground, infoBackgroundOpacity / 100f)
+    val clockPillStyle = OverlayStyle(
+        scale = 1f,
+        light = clockLight,
+        background = clockBackground,
+        backgroundOpacity = clockBackgroundOpacity / 100f,
+        cornerRadius = clockCornerRadius
+    )
     val overlayStyle = OverlayStyle(
         scale = overlayScale / 100f,
-        light = overlayTextColor != "dark",
-        showBackground = overlayBackground,
-        backgroundOpacity = overlayBackgroundOpacity / 100f,
-        cornerRadius = overlayCornerRadius
+        light = infoLight,
+        background = infoBackground,
+        backgroundOpacity = infoBackgroundOpacity / 100f,
+        cornerRadius = infoCornerRadius
     )
-    val clockAlignment = remember(overlayClockPosition) { overlayAlignment(overlayClockPosition) }
     val clockStyle = remember(clockScale, clockFont, clockWeight, clockLetterSpacing) {
         ClockStyle(
             scale = clockScale / 100f,
@@ -136,7 +166,6 @@ fun SlideshowScreen(
             letterSpacing = clockLetterSpacing / 10f
         )
     }
-    val infoAlignment = remember(overlayInfoPosition) { overlayAlignment(overlayInfoPosition) }
     val overlayAnimation = OverlayAnimation(
         mode = overlayAnimationMode,
         expandedScale = overlayExpandScale / 100f,
@@ -329,7 +358,7 @@ fun SlideshowScreen(
                 clockFormat = clockFormat,
                 dateFormat = dateFormat,
                 alignment = clockAlignment,
-                style = overlayStyle,
+                style = clockPillStyle,
                 clock = clockStyle
             )
 

@@ -59,7 +59,7 @@ import java.util.Locale
 data class OverlayStyle(
     val scale: Float = 1f,
     val light: Boolean = true,
-    val showBackground: Boolean = true,
+    val background: String = SettingsRepository.BACKGROUND_AUTO,
     val backgroundOpacity: Float = 0.53f,
     val cornerRadius: Int = 16
 ) {
@@ -67,13 +67,48 @@ data class OverlayStyle(
     val secondary: Color get() = if (light) Color(0xCCFFFFFF) else Color(0xCC101010)
     val tertiary: Color get() = if (light) Color(0x99FFFFFF) else Color(0x99101010)
     val rating: Color get() = if (light) Color(0xFFFFD700) else Color(0xFFB8860B)
+    val showBackground: Boolean get() = background != SettingsRepository.BACKGROUND_NONE
     val scrim: Color
-        get() = (if (light) Color.Black else Color.White).copy(alpha = backgroundOpacity)
+        get() = when (background) {
+            SettingsRepository.BACKGROUND_DARK -> Color.Black.copy(alpha = backgroundOpacity)
+            SettingsRepository.BACKGROUND_LIGHT -> Color.White.copy(alpha = backgroundOpacity)
+            // Auto: opposite of the text, so the pill always separates from itself.
+            else -> (if (light) Color.Black else Color.White).copy(alpha = backgroundOpacity)
+        }
     val shadow: Shadow
         get() = if (light) Shadow(Color(0xAA000000), Offset(0f, 1f), 3f)
                 else Shadow(Color(0x66FFFFFF), Offset(0f, 1f), 3f)
 
     fun size(baseSp: Int): TextUnit = (baseSp * scale).sp
+}
+
+/**
+ * Resolve a text-colour setting to "draw white" / "draw black".
+ *
+ * [auto] is decided per photo from the average brightness of the image under the
+ * pill: dark photo -> white text, bright photo -> black text. A tinted pill lightens
+ * or darkens that background first, so a 70% black scrim over a bright photo still
+ * counts as dark and keeps white text.
+ */
+fun resolveLightText(
+    mode: String,
+    backgroundLuminance: Float?,
+    background: String,
+    backgroundOpacity: Float
+): Boolean = when (mode) {
+    SettingsRepository.TEXT_COLOR_DARK -> false
+    SettingsRepository.TEXT_COLOR_LIGHT -> true
+    else -> {
+        val lum = backgroundLuminance ?: return true
+        val scrim = when (background) {
+            SettingsRepository.BACKGROUND_NONE -> 0f
+            SettingsRepository.BACKGROUND_DARK -> backgroundOpacity
+            SettingsRepository.BACKGROUND_LIGHT -> -backgroundOpacity
+            else -> 0f // auto scrim flips with the text, so it does not bias the choice
+        }
+        val effective = if (scrim >= 0f) lum * (1f - scrim) else lum + (1f - lum) * (-scrim)
+        effective < 0.55f
+    }
 }
 
 /**
