@@ -255,7 +255,13 @@ fun SettingsScreen(
 
         // ── Server Connection ──
         var serverOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Server Connection", serverOpen, { serverOpen = !serverOpen }) {
+        CollapsibleSection(
+            "Server Connection",
+            serverOpen,
+            { serverOpen = !serverOpen },
+            subtitle = if (serverUrl.isBlank()) "Not configured"
+            else serverUrl.removePrefix("https://").removePrefix("http://").trimEnd('/')
+        ) {
 
         // Status indicator
         Row(
@@ -332,7 +338,16 @@ fun SettingsScreen(
 
         // ── Photo Sources ──
         var sourcesOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Photo Sources", sourcesOpen, { sourcesOpen = !sourcesOpen }) {
+        CollapsibleSection(
+            "Photo Sources",
+            sourcesOpen,
+            { sourcesOpen = !sourcesOpen },
+            subtitle = buildList {
+                val albums = albumIdsRaw.size
+                if (albums > 0) add("$albums Immich album" + if (albums == 1) "" else "s")
+                if (localFolderEnabled) add("local folder")
+            }.joinToString(" + ").ifEmpty { "No sources selected" }
+        ) {
 
         // Albums (foldable)
         var albumsExpanded by remember { mutableStateOf(false) }
@@ -476,7 +491,16 @@ fun SettingsScreen(
 
         // ── Slideshow ──
         var slideshowOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Slideshow", slideshowOpen, { slideshowOpen = !slideshowOpen }) {
+        CollapsibleSection(
+            "Slideshow",
+            slideshowOpen,
+            { slideshowOpen = !slideshowOpen },
+            subtitle = buildList {
+                add("${formatDuration(duration)} per photo")
+                if (kenBurnsEnabled) add("Ken Burns")
+                if (photoOrder == "chronological") add("by date") else add("random")
+            }.joinToString(" \u00B7 ")
+        ) {
 
         DurationSetting("Photo Duration", duration) {
             scope.launch { settings.save(SettingsRepository.DURATION, it) }
@@ -555,299 +579,228 @@ fun SettingsScreen(
         }
         SectionDivider()
 
-        // ── Overlays ──
-        var overlaysOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Overlays", overlaysOpen, { overlaysOpen = !overlaysOpen }) {
-
-        Text(
-            "Fields",
-            color = subtextColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-        )
-
-        // Clock format
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // ── Clock ──
+        var clockOpen by remember { mutableStateOf(false) }
+        CollapsibleSection(
+            "Clock",
+            clockOpen,
+            { clockOpen = !clockOpen },
+            subtitle = clockSectionSummary(showClock, showDate, clockFormat, clockScale, clockFont, clockWeight)
         ) {
-            Text("Clock", color = textColor, fontSize = 16.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("12" to "12h", "24" to "24h").forEach { (value, label) ->
-                    OutlinedButton(
-                        onClick = { scope.launch { settings.save(SettingsRepository.CLOCK_FORMAT, value) } },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (clockFormat == value) Color.Black else textColor,
-                            containerColor = if (clockFormat == value) sectionColor else Color.Transparent
-                        ),
-                        modifier = Modifier.height(36.dp)
-                    ) { Text(label, fontSize = 12.sp) }
-                }
-            }
-        }
-        SettingsToggle("Clock", showClock) { scope.launch { settings.save(SettingsRepository.SHOW_CLOCK, it) } }
-        SettingsToggle("Current Date", showDate) { scope.launch { settings.save(SettingsRepository.SHOW_DATE, it) } }
-        SettingsToggle("Photo Date", showPhotoDate) { scope.launch { settings.save(SettingsRepository.SHOW_PHOTO_DATE, it) } }
-        SettingsToggle("Location", showLocation) { scope.launch { settings.save(SettingsRepository.SHOW_LOCATION, it) } }
-        SettingsToggle("Description", showDescription) { scope.launch { settings.save(SettingsRepository.SHOW_DESCRIPTION, it) } }
-        SettingsToggle("People", showPeople) { scope.launch { settings.save(SettingsRepository.SHOW_PEOPLE, it) } }
-        SettingsToggle("Camera", showCamera) { scope.launch { settings.save(SettingsRepository.SHOW_CAMERA, it) } }
-        SettingsToggle("Star Rating", showRating) { scope.launch { settings.save(SettingsRepository.SHOW_RATING, it) } }
-        SettingsToggle("Person Age", showPersonAge) { scope.launch { settings.save(SettingsRepository.SHOW_PERSON_AGE, it) } }
 
-        // ── Overlay presentation ──
-        Text(
-            "Overlay Style",
-            color = subtextColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-        )
-
-        OverlayPositionRow("Clock Position", overlayClockPosition) {
-            scope.launch { settings.save(SettingsRepository.OVERLAY_CLOCK_POSITION, it) }
-        }
-
-        Text(
-            "Clock Style",
-            color = subtextColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
-        )
-        Text(
-            "The clock and the current date are sized and styled separately from the photo info below.",
-            color = subtextColor,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(bottom = 2.dp)
-        )
-
-        OverlayChoiceBlock(
-            "Font",
-            listOf(
-                SettingsRepository.CLOCK_FONT_SANS to "Sans",
-                SettingsRepository.CLOCK_FONT_SERIF to "Serif",
-                SettingsRepository.CLOCK_FONT_CONDENSED to "Condensed",
-                SettingsRepository.CLOCK_FONT_MONO to "Mono"
-            ),
-            clockFont,
-            fontFor = { clockFontFamily(it, clockWeight) }
-        ) { scope.launch { settings.save(SettingsRepository.CLOCK_FONT, it) } }
-
-        OverlayChoiceBlock(
-            "Weight",
-            listOf(
-                SettingsRepository.CLOCK_WEIGHT_THIN to "Thin",
-                SettingsRepository.CLOCK_WEIGHT_LIGHT to "Light",
-                SettingsRepository.CLOCK_WEIGHT_NORMAL to "Regular",
-                SettingsRepository.CLOCK_WEIGHT_MEDIUM to "Medium",
-                SettingsRepository.CLOCK_WEIGHT_BOLD to "Bold"
-            ),
-            clockWeight,
-            fontFor = { clockFontFamily(clockFont, clockWeight) }
-        ) { scope.launch { settings.save(SettingsRepository.CLOCK_WEIGHT, it) } }
-
-        SliderSetting("Clock Size", clockScale.toFloat(), 40f..400f, "%") {
-            scope.launch { settings.save(SettingsRepository.CLOCK_SCALE, it.roundToInt()) }
-        }
-        SliderSetting(
-            "Letter Spacing",
-            clockLetterSpacing.toFloat(),
-            -20f..80f,
-            "",
-            format = { "%.1f sp".format(it / 10f) }
-        ) {
-            scope.launch { settings.save(SettingsRepository.CLOCK_LETTER_SPACING, it.roundToInt()) }
-        }
-        OverlayPositionRow("Photo Info Position", overlayInfoPosition) {
-            scope.launch { settings.save(SettingsRepository.OVERLAY_INFO_POSITION, it) }
-        }
-        OverlayChoiceRow(
-            "Text Size",
-            listOf("small" to "Small", "medium" to "Medium", "large" to "Large"),
-            overlayTextSize
-        ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_SIZE, it) } }
-        OverlayChoiceRow(
-            "Text Color",
-            listOf("light" to "Light", "dark" to "Dark"),
-            overlayTextColor
-        ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_COLOR, it) } }
-        OverlayChoiceRow(
-            "Background",
-            listOf("pill" to "Pill", "none" to "None"),
-            if (overlayBackground) "pill" else "none"
-        ) { scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND, it == "pill") } }
-
-        if (overlayBackground) {
-            SliderSetting("Background Opacity", overlayBackgroundOpacity.toFloat(), 0f..100f, "%") {
-                scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND_OPACITY, it.roundToInt()) }
-            }
-        }
-        SliderSetting("Corner Radius", overlayCornerRadius.toFloat(), 0f..32f, "dp") {
-            scope.launch { settings.save(SettingsRepository.OVERLAY_CORNER_RADIUS, it.roundToInt()) }
-        }
-
-        Text(
-            "Motion",
-            color = subtextColor,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-        )
-
-        OverlayChoiceRow(
-            "Animation",
-            listOf(
-                SettingsRepository.OVERLAY_ANIM_STATIC to "Static",
-                SettingsRepository.OVERLAY_ANIM_LOOP to "Loop",
-                SettingsRepository.OVERLAY_ANIM_ONCE to "Once"
-            ),
-            overlayAnimation
-        ) { scope.launch { settings.save(SettingsRepository.OVERLAY_ANIMATION, it) } }
-
-        SettingsToggle("Marquee Long Text", overlayMarquee) {
-            scope.launch { settings.save(SettingsRepository.OVERLAY_MARQUEE, it) }
-        }
-
-        if (overlayAnimation != SettingsRepository.OVERLAY_ANIM_STATIC) {
-            Text(
-                overlayAnimationDescription(overlayAnimation),
-                color = subtextColor,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
-            )
-
-            SliderSetting("Expanded Size", overlayExpandScale.toFloat(), 50f..200f, "%") {
-                scope.launch { settings.save(SettingsRepository.OVERLAY_EXPAND_SCALE, it.roundToInt()) }
-            }
-            SliderSetting("Collapsed Size", overlayCollapsedScale.toFloat(), 50f..200f, "%") {
-                scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SCALE, it.roundToInt()) }
-            }
-
-            if (!overlayExpandedIndefinite) {
-                SliderSetting("Expanded Hold", overlayExpandedSeconds.toFloat(), 1f..120f, "s") {
-                    scope.launch { settings.save(SettingsRepository.OVERLAY_EXPANDED_SECONDS, it.roundToInt()) }
-                }
-            }
-            SettingsToggle("Hold Open Forever", overlayExpandedIndefinite) {
-                scope.launch { settings.save(SettingsRepository.OVERLAY_EXPANDED_INDEFINITE, it) }
-            }
-
-            if (overlayAnimation == SettingsRepository.OVERLAY_ANIM_LOOP) {
-                if (!overlayCollapsedIndefinite) {
-                    SliderSetting("Collapsed Hold", overlayCollapsedSeconds.toFloat(), 1f..120f, "s") {
-                        scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SECONDS, it.roundToInt()) }
-                    }
-                }
-                SettingsToggle("Stay Collapsed", overlayCollapsedIndefinite) {
-                    scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_INDEFINITE, it) }
-                }
-            }
-
-            Text(
-                "Collapsed Shows",
-                color = textColor,
-                fontSize = 15.sp,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            listOf(
-                SettingsRepository.OVERLAY_FIELD_DATE to "Date",
-                SettingsRepository.OVERLAY_FIELD_LOCATION to "Location",
-                SettingsRepository.OVERLAY_FIELD_DESCRIPTION to "Description",
-                SettingsRepository.OVERLAY_FIELD_PEOPLE to "People",
-                SettingsRepository.OVERLAY_FIELD_CAMERA to "Camera",
-                SettingsRepository.OVERLAY_FIELD_RATING to "Rating"
-            ).chunked(3).forEach { rowFields ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 6.dp)
-                ) {
-                    rowFields.forEach { (field, label) ->
-                        val selected = field in overlayCollapsedFields
+        SettingsToggle("Show Clock", showClock) { scope.launch { settings.save(SettingsRepository.SHOW_CLOCK, it) } }
+        if (showClock) {
+            // Clock format
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Format", color = textColor, fontSize = 16.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("12" to "12h", "24" to "24h").forEach { (value, label) ->
                         OutlinedButton(
-                            onClick = {
-                                val updated =
-                                    if (selected) overlayCollapsedFields - field
-                                    else overlayCollapsedFields + field
-                                scope.launch { settings.saveOverlayCollapsedFields(updated) }
-                            },
+                            onClick = { scope.launch { settings.save(SettingsRepository.CLOCK_FORMAT, value) } },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = if (selected) Color.Black else textColor,
-                                containerColor = if (selected) sectionColor else Color.Transparent
+                                contentColor = if (clockFormat == value) Color.Black else textColor,
+                                containerColor = if (clockFormat == value) sectionColor else Color.Transparent
                             ),
-                            modifier = Modifier.height(34.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            modifier = Modifier.height(36.dp)
                         ) { Text(label, fontSize = 12.sp) }
                     }
                 }
             }
         }
 
+        SettingsToggle("Show Current Date", showDate) { scope.launch { settings.save(SettingsRepository.SHOW_DATE, it) } }
+
+        // Everything below styles the clock pill as a whole (the clock and the
+        // date under it), so it only matters while one of the two is shown.
+        val clockShown = showClock || showDate
+        if (clockShown) {
+            SubHeading("Look")
+            OverlayPositionRow("Position", overlayClockPosition) {
+                scope.launch { settings.save(SettingsRepository.OVERLAY_CLOCK_POSITION, it) }
+            }
+            OverlayChoiceBlock(
+                "Font",
+                listOf(
+                    SettingsRepository.CLOCK_FONT_SANS to "Sans",
+                    SettingsRepository.CLOCK_FONT_SERIF to "Serif",
+                    SettingsRepository.CLOCK_FONT_CONDENSED to "Condensed",
+                    SettingsRepository.CLOCK_FONT_MONO to "Mono"
+                ),
+                clockFont,
+                fontFor = { clockFontFamily(it, clockWeight) }
+            ) { scope.launch { settings.save(SettingsRepository.CLOCK_FONT, it) } }
+
+            OverlayChoiceBlock(
+                "Weight",
+                listOf(
+                    SettingsRepository.CLOCK_WEIGHT_THIN to "Thin",
+                    SettingsRepository.CLOCK_WEIGHT_LIGHT to "Light",
+                    SettingsRepository.CLOCK_WEIGHT_NORMAL to "Regular",
+                    SettingsRepository.CLOCK_WEIGHT_MEDIUM to "Medium",
+                    SettingsRepository.CLOCK_WEIGHT_BOLD to "Bold"
+                ),
+                clockWeight,
+                fontFor = { clockFontFamily(clockFont, clockWeight) }
+            ) { scope.launch { settings.save(SettingsRepository.CLOCK_WEIGHT, it) } }
+
+            SliderSetting("Size", clockScale.toFloat(), 40f..400f, "%") {
+                scope.launch { settings.save(SettingsRepository.CLOCK_SCALE, it.roundToInt()) }
+            }
+            SliderSetting(
+                "Letter Spacing",
+                clockLetterSpacing.toFloat(),
+                -20f..80f,
+                "",
+                format = { "%.1f sp".format(it / 10f) }
+            ) {
+                scope.launch { settings.save(SettingsRepository.CLOCK_LETTER_SPACING, it.roundToInt()) }
+            }
+            HintText("Size, font and spacing apply to both the clock and the date under it.")
+        } else {
+            HintText("Nothing to style while the clock and its date are both hidden.")
+        }
+
         }
         SectionDivider()
 
-        // ── Now Playing Pill (over the slideshow) ──
-        var npOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Now Playing Pill", npOpen, { npOpen = !npOpen }) {
-            Text(
-                "Shown over the slideshow while music plays.",
-                color = subtextColor, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp)
+        // ── Photo Info ──
+        var photoInfoOpen by remember { mutableStateOf(false) }
+        // Person age reads the people names, so it only counts while People is on.
+        val infoShown = showPhotoDate || showLocation || showDescription ||
+            showPeople || showCamera || showRating
+        CollapsibleSection(
+            "Photo Info",
+            photoInfoOpen,
+            { photoInfoOpen = !photoInfoOpen },
+            subtitle = photoInfoSectionSummary(
+                showPhotoDate, showLocation, showDescription, showPeople, showPersonAge,
+                showCamera, showRating
             )
-            SettingsToggle("Album Art", npShowArt) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ART, it) } }
-            SettingsToggle("Title", npShowTitle) { scope.launch { settings.save(SettingsRepository.NP_SHOW_TITLE, it) } }
-            SettingsToggle("Artist", npShowArtist) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ARTIST, it) } }
-            SettingsToggle("Play / Skip Controls", npShowControls) { scope.launch { settings.save(SettingsRepository.NP_SHOW_CONTROLS, it) } }
+        ) {
 
-            SliderSetting("Expanded Size", npExpandedScale.toFloat(), 50f..200f, "%") {
-                scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SCALE, it.roundToInt()) }
+        SubHeading("Fields")
+        SettingsToggle("Photo Date", showPhotoDate) { scope.launch { settings.save(SettingsRepository.SHOW_PHOTO_DATE, it) } }
+        SettingsToggle("Location", showLocation) { scope.launch { settings.save(SettingsRepository.SHOW_LOCATION, it) } }
+        SettingsToggle("Description", showDescription) { scope.launch { settings.save(SettingsRepository.SHOW_DESCRIPTION, it) } }
+        SettingsToggle("People", showPeople) { scope.launch { settings.save(SettingsRepository.SHOW_PEOPLE, it) } }
+        if (showPeople) {
+            SettingsToggle("Person Age", showPersonAge) { scope.launch { settings.save(SettingsRepository.SHOW_PERSON_AGE, it) } }
+        }
+        SettingsToggle("Camera", showCamera) { scope.launch { settings.save(SettingsRepository.SHOW_CAMERA, it) } }
+        SettingsToggle("Star Rating", showRating) { scope.launch { settings.save(SettingsRepository.SHOW_RATING, it) } }
+
+        if (!infoShown) {
+            HintText("No fields selected — the photo info pill stays hidden.")
+        } else {
+            SubHeading("Look")
+            OverlayPositionRow("Position", overlayInfoPosition) {
+                scope.launch { settings.save(SettingsRepository.OVERLAY_INFO_POSITION, it) }
             }
-            SliderSetting("Collapsed Size", npCollapsedScale.toFloat(), 50f..200f, "%") {
-                scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SCALE, it.roundToInt()) }
+            OverlayChoiceRow(
+                "Text Size",
+                listOf("small" to "Small", "medium" to "Medium", "large" to "Large"),
+                overlayTextSize
+            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_SIZE, it) } }
+            OverlayChoiceRow(
+                "Text Color",
+                listOf("light" to "Light", "dark" to "Dark"),
+                overlayTextColor
+            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_COLOR, it) } }
+            OverlayChoiceRow(
+                "Background",
+                listOf("pill" to "Pill", "none" to "None"),
+                if (overlayBackground) "pill" else "none"
+            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND, it == "pill") } }
+
+            if (overlayBackground) {
+                SliderSetting("Background Opacity", overlayBackgroundOpacity.toFloat(), 0f..100f, "%") {
+                    scope.launch { settings.save(SettingsRepository.OVERLAY_BACKGROUND_OPACITY, it.roundToInt()) }
+                }
             }
-            SliderSetting("Background Opacity", npBackgroundOpacity.toFloat(), 0f..100f, "%") {
-                scope.launch { settings.save(SettingsRepository.NP_BACKGROUND_OPACITY, it.roundToInt()) }
+            SliderSetting("Corner Radius", overlayCornerRadius.toFloat(), 0f..32f, "dp") {
+                scope.launch { settings.save(SettingsRepository.OVERLAY_CORNER_RADIUS, it.roundToInt()) }
             }
-            SliderSetting("Corner Radius", npCornerRadius.toFloat(), 0f..32f, "dp") {
-                scope.launch { settings.save(SettingsRepository.NP_CORNER_RADIUS, it.roundToInt()) }
-            }
+            SubHeading("Motion")
 
             OverlayChoiceRow(
-                "Collapse",
+                "Animation",
                 listOf(
                     SettingsRepository.OVERLAY_ANIM_STATIC to "Static",
                     SettingsRepository.OVERLAY_ANIM_LOOP to "Loop",
                     SettingsRepository.OVERLAY_ANIM_ONCE to "Once"
                 ),
-                npAnimation
-            ) { scope.launch { settings.save(SettingsRepository.NP_ANIMATION, it) } }
+                overlayAnimation
+            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_ANIMATION, it) } }
 
-            if (npAnimation != SettingsRepository.OVERLAY_ANIM_STATIC) {
-                SliderSetting("Expanded Hold", npExpandedSeconds.toFloat(), 1f..120f, "s") {
-                    scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SECONDS, it.roundToInt()) }
+            SettingsToggle("Marquee Long Text", overlayMarquee) {
+                scope.launch { settings.save(SettingsRepository.OVERLAY_MARQUEE, it) }
+            }
+
+            if (overlayAnimation != SettingsRepository.OVERLAY_ANIM_STATIC) {
+                Text(
+                    overlayAnimationDescription(overlayAnimation),
+                    color = subtextColor,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                )
+
+                SliderSetting("Expanded Size", overlayExpandScale.toFloat(), 50f..200f, "%") {
+                    scope.launch { settings.save(SettingsRepository.OVERLAY_EXPAND_SCALE, it.roundToInt()) }
                 }
-                if (npAnimation == SettingsRepository.OVERLAY_ANIM_LOOP) {
-                    SliderSetting("Collapsed Hold", npCollapsedSeconds.toFloat(), 1f..120f, "s") {
-                        scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SECONDS, it.roundToInt()) }
+                SliderSetting("Collapsed Size", overlayCollapsedScale.toFloat(), 50f..200f, "%") {
+                    scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SCALE, it.roundToInt()) }
+                }
+
+                if (!overlayExpandedIndefinite) {
+                    SliderSetting("Expanded Hold", overlayExpandedSeconds.toFloat(), 1f..120f, "s") {
+                        scope.launch { settings.save(SettingsRepository.OVERLAY_EXPANDED_SECONDS, it.roundToInt()) }
                     }
                 }
-                Text("Collapsed Shows", color = textColor, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+                SettingsToggle("Hold Open Forever", overlayExpandedIndefinite) {
+                    scope.launch { settings.save(SettingsRepository.OVERLAY_EXPANDED_INDEFINITE, it) }
+                }
+
+                if (overlayAnimation == SettingsRepository.OVERLAY_ANIM_LOOP) {
+                    if (!overlayCollapsedIndefinite) {
+                        SliderSetting("Collapsed Hold", overlayCollapsedSeconds.toFloat(), 1f..120f, "s") {
+                            scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SECONDS, it.roundToInt()) }
+                        }
+                    }
+                    SettingsToggle("Stay Collapsed", overlayCollapsedIndefinite) {
+                        scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_INDEFINITE, it) }
+                    }
+                }
+
+                Text(
+                    "Collapsed Shows",
+                    color = textColor,
+                    fontSize = 15.sp,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
                 listOf(
-                    "art" to "Album Art",
-                    "title" to "Title",
-                    "artist" to "Artist",
-                    "controls" to "Controls"
-                ).chunked(2).forEach { rowItems ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                        rowItems.forEach { (element, label) ->
-                            val selected = element in npCollapsedElements
+                    SettingsRepository.OVERLAY_FIELD_DATE to "Date",
+                    SettingsRepository.OVERLAY_FIELD_LOCATION to "Location",
+                    SettingsRepository.OVERLAY_FIELD_DESCRIPTION to "Description",
+                    SettingsRepository.OVERLAY_FIELD_PEOPLE to "People",
+                    SettingsRepository.OVERLAY_FIELD_CAMERA to "Camera",
+                    SettingsRepository.OVERLAY_FIELD_RATING to "Rating"
+                ).chunked(3).forEach { rowFields ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        rowFields.forEach { (field, label) ->
+                            val selected = field in overlayCollapsedFields
                             OutlinedButton(
                                 onClick = {
                                     val updated =
-                                        if (selected) npCollapsedElements - element
-                                        else npCollapsedElements + element
-                                    scope.launch { settings.saveNpCollapsedElements(updated) }
+                                        if (selected) overlayCollapsedFields - field
+                                        else overlayCollapsedFields + field
+                                    scope.launch { settings.saveOverlayCollapsedFields(updated) }
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = if (selected) Color.Black else textColor,
@@ -860,13 +813,47 @@ fun SettingsScreen(
                     }
                 }
             }
+
+        }
+
+        }
+        SectionDivider()
+
+        // ── Sleep ──
+        var sleepOpen by remember { mutableStateOf(false) }
+        CollapsibleSection(
+            "Sleep Schedule",
+            sleepOpen,
+            { sleepOpen = !sleepOpen },
+            subtitle = sleepSectionSummary(sleepEnabled, sleepStartHour, sleepEndHour, sleepDim)
+        ) {
+        SettingsToggle("Enable Sleep Mode", sleepEnabled) {
+            scope.launch { settings.save(SettingsRepository.SLEEP_ENABLED, it) }
+        }
+        if (sleepEnabled) {
+            SliderSetting("Sleep Start", sleepStartHour.toFloat(), 0f..23f, ":00", steps = 22) {
+                scope.launch { settings.save(SettingsRepository.SLEEP_START_HOUR, it.roundToInt()) }
+            }
+            SliderSetting("Wake Up", sleepEndHour.toFloat(), 0f..23f, ":00", steps = 22) {
+                scope.launch { settings.save(SettingsRepository.SLEEP_END_HOUR, it.roundToInt()) }
+            }
+            SettingsToggle("Dim (vs black)", sleepDim) {
+                scope.launch { settings.save(SettingsRepository.SLEEP_DIM, it) }
+            }
+        }
+
         }
 
         SectionDivider()
 
         // ── Sync & Cache ──
         var syncOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Sync & Cache", syncOpen, { syncOpen = !syncOpen }) {
+        CollapsibleSection(
+            "Sync & Cache",
+            syncOpen,
+            { syncOpen = !syncOpen },
+            subtitle = "every ${formatDuration(syncInterval * 60)} \u00B7 up to $maxCached photos"
+        ) {
 
         SliderSetting(
             "Sync Interval", syncInterval.toFloat(), 15f..360f, "min",
@@ -919,30 +906,15 @@ fun SettingsScreen(
         }
         SectionDivider()
 
-        // ── Sleep ──
-        var sleepOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Sleep Schedule", sleepOpen, { sleepOpen = !sleepOpen }) {
-        SettingsToggle("Enable Sleep Mode", sleepEnabled) {
-            scope.launch { settings.save(SettingsRepository.SLEEP_ENABLED, it) }
-        }
-        if (sleepEnabled) {
-            SliderSetting("Sleep Start", sleepStartHour.toFloat(), 0f..23f, ":00", steps = 22) {
-                scope.launch { settings.save(SettingsRepository.SLEEP_START_HOUR, it.roundToInt()) }
-            }
-            SliderSetting("Wake Up", sleepEndHour.toFloat(), 0f..23f, ":00", steps = 22) {
-                scope.launch { settings.save(SettingsRepository.SLEEP_END_HOUR, it.roundToInt()) }
-            }
-            SettingsToggle("Dim (vs black)", sleepDim) {
-                scope.launch { settings.save(SettingsRepository.SLEEP_DIM, it) }
-            }
-        }
-
-        }
-        SectionDivider()
-
         // ── Music (Navidrome) ──
         var musicOpen by remember { mutableStateOf(false) }
-        CollapsibleSection("Music (Navidrome)", musicOpen, { musicOpen = !musicOpen }) {
+        CollapsibleSection(
+            "Music (Navidrome)",
+            musicOpen,
+            { musicOpen = !musicOpen },
+            subtitle = if (!navidromeEnabled) "Off"
+            else navidromeUrl.removePrefix("https://").removePrefix("http://").trimEnd('/')
+        ) {
 
         SettingsToggle("Enable Music", navidromeEnabled) {
             scope.launch { settings.save(SettingsRepository.NAVIDROME_ENABLED, it) }
@@ -1126,6 +1098,97 @@ fun SettingsScreen(
         }
         SectionDivider()
 
+        // ── Now Playing Pill (over the slideshow) ──
+        // Only meaningful while music is enabled, so it is hidden with music off.
+        if (navidromeEnabled) {
+            // ── Now Playing Pill (over the slideshow) ──
+            var npOpen by remember { mutableStateOf(false) }
+            CollapsibleSection(
+                "Now Playing Pill",
+                npOpen,
+                { npOpen = !npOpen },
+                subtitle = buildList {
+                    if (npShowArt) add("art")
+                    if (npShowTitle) add("title")
+                    if (npShowArtist) add("artist")
+                    if (npShowControls) add("controls")
+                }.joinToString(", ").ifEmpty { "Empty pill" }
+            ) {
+                Text(
+                    "Shown over the slideshow while music plays.",
+                    color = subtextColor, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp)
+                )
+                SettingsToggle("Album Art", npShowArt) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ART, it) } }
+                SettingsToggle("Title", npShowTitle) { scope.launch { settings.save(SettingsRepository.NP_SHOW_TITLE, it) } }
+                SettingsToggle("Artist", npShowArtist) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ARTIST, it) } }
+                SettingsToggle("Play / Skip Controls", npShowControls) { scope.launch { settings.save(SettingsRepository.NP_SHOW_CONTROLS, it) } }
+
+                SliderSetting("Expanded Size", npExpandedScale.toFloat(), 50f..200f, "%") {
+                    scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SCALE, it.roundToInt()) }
+                }
+                SliderSetting("Collapsed Size", npCollapsedScale.toFloat(), 50f..200f, "%") {
+                    scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SCALE, it.roundToInt()) }
+                }
+                SliderSetting("Background Opacity", npBackgroundOpacity.toFloat(), 0f..100f, "%") {
+                    scope.launch { settings.save(SettingsRepository.NP_BACKGROUND_OPACITY, it.roundToInt()) }
+                }
+                SliderSetting("Corner Radius", npCornerRadius.toFloat(), 0f..32f, "dp") {
+                    scope.launch { settings.save(SettingsRepository.NP_CORNER_RADIUS, it.roundToInt()) }
+                }
+
+                OverlayChoiceRow(
+                    "Collapse",
+                    listOf(
+                        SettingsRepository.OVERLAY_ANIM_STATIC to "Static",
+                        SettingsRepository.OVERLAY_ANIM_LOOP to "Loop",
+                        SettingsRepository.OVERLAY_ANIM_ONCE to "Once"
+                    ),
+                    npAnimation
+                ) { scope.launch { settings.save(SettingsRepository.NP_ANIMATION, it) } }
+
+                if (npAnimation != SettingsRepository.OVERLAY_ANIM_STATIC) {
+                    SliderSetting("Expanded Hold", npExpandedSeconds.toFloat(), 1f..120f, "s") {
+                        scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SECONDS, it.roundToInt()) }
+                    }
+                    if (npAnimation == SettingsRepository.OVERLAY_ANIM_LOOP) {
+                        SliderSetting("Collapsed Hold", npCollapsedSeconds.toFloat(), 1f..120f, "s") {
+                            scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SECONDS, it.roundToInt()) }
+                        }
+                    }
+                    Text("Collapsed Shows", color = textColor, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+                    listOf(
+                        "art" to "Album Art",
+                        "title" to "Title",
+                        "artist" to "Artist",
+                        "controls" to "Controls"
+                    ).chunked(2).forEach { rowItems ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                            rowItems.forEach { (element, label) ->
+                                val selected = element in npCollapsedElements
+                                OutlinedButton(
+                                    onClick = {
+                                        val updated =
+                                            if (selected) npCollapsedElements - element
+                                            else npCollapsedElements + element
+                                        scope.launch { settings.saveNpCollapsedElements(updated) }
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = if (selected) Color.Black else textColor,
+                                        containerColor = if (selected) sectionColor else Color.Transparent
+                                    ),
+                                    modifier = Modifier.height(34.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                                ) { Text(label, fontSize = 12.sp) }
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            SectionDivider()
+        }
+
         // ── System ──
         var systemOpen by remember { mutableStateOf(false) }
         CollapsibleSection("System", systemOpen, { systemOpen = !systemOpen }) {
@@ -1170,6 +1233,7 @@ private fun CollapsibleSection(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    subtitle: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Row(
@@ -1180,13 +1244,97 @@ private fun CollapsibleSection(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, color = sectionColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = sectionColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            // A one-line "what is this set to" summary, shown while collapsed so the
+            // page reads as a status list rather than a wall of identical headers.
+            if (!expanded && !subtitle.isNullOrBlank()) {
+                Text(subtitle, color = subtextColor, fontSize = 12.sp)
+            }
+        }
         Text(if (expanded) "\u25B2" else "\u25BC", color = subtextColor, fontSize = 13.sp)
     }
     AnimatedVisibility(visible = expanded) {
         Column(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }
+
+// Grouping label inside a section (e.g. "Fields" / "Look" / "Motion").
+@Composable
+private fun SubHeading(text: String) {
+    Text(
+        text,
+        color = subtextColor,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+    )
+}
+
+// Quiet explanatory line: why an option is hidden, or what a group of controls does.
+@Composable
+private fun HintText(text: String) {
+    Text(
+        text,
+        color = subtextColor,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+    )
+}
+
+private fun clockSectionSummary(
+    showClock: Boolean,
+    showDate: Boolean,
+    clockFormat: String,
+    scale: Int,
+    font: String,
+    weight: String
+): String = when {
+    !showClock && !showDate -> "Hidden"
+    !showClock -> "Date only"
+    else -> buildString {
+        append(if (clockFormat == "24") "24-hour" else "12-hour")
+        append(" \u00B7 ")
+        append(clockFontLabel(font))
+        append(' ')
+        append(weight.replaceFirstChar { it.uppercaseChar() })
+        append(" \u00B7 ")
+        append("$scale%")
+        if (showDate) append(" \u00B7 date")
+    }
+}
+
+private fun clockFontLabel(font: String): String = when (font) {
+    SettingsRepository.CLOCK_FONT_SERIF -> "Serif"
+    SettingsRepository.CLOCK_FONT_MONO -> "Mono"
+    SettingsRepository.CLOCK_FONT_CONDENSED -> "Condensed"
+    else -> "Sans"
+}
+
+private fun photoInfoSectionSummary(
+    photoDate: Boolean,
+    location: Boolean,
+    description: Boolean,
+    people: Boolean,
+    personAge: Boolean,
+    camera: Boolean,
+    rating: Boolean
+): String {
+    val on = buildList {
+        if (photoDate) add("date")
+        if (location) add("location")
+        if (description) add("description")
+        if (people) add(if (personAge) "people + age" else "people")
+        if (camera) add("camera")
+        if (rating) add("rating")
+    }
+    return if (on.isEmpty()) "Hidden" else on.joinToString(", ")
+}
+
+private fun sleepSectionSummary(enabled: Boolean, startHour: Int, endHour: Int, dim: Boolean): String =
+    if (!enabled) "Off"
+    else "%02d:00 \u2192 %02d:00 \u00B7 %s".format(startHour, endHour, if (dim) "dim" else "black")
+
 
 @Composable
 private fun SectionDivider() {

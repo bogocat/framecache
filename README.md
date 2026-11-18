@@ -78,19 +78,19 @@ Get album IDs from the URL when viewing an album in Immich (the UUID in the addr
 
 ## Settings
 
-Swipe down or long-press on the slideshow to open settings.
+Swipe down or long-press on the slideshow to open settings. Sections are collapsible and show their current state while closed (e.g. `Clock — 12-hour · Condensed Light · 200% · date`), and controls that no longer apply are hidden: turning the clock off hides its format and styling, with music off the now-playing pill section disappears.
 
 | Section | Options |
 |---------|---------|
 | **Server Connection** | Server URL, API key, album IDs |
 | **Photo Sources** | Immich albums, local folder |
 | **Slideshow** | Photo duration (presets + custom, 1s–24h), crossfade, Ken Burns + zoom, background blur, fill vs fit, progress bar, order, favourites only, photo orientation |
-| **Overlays** | Show toggles (clock, date, photo date, location, description, people, camera, rating, age); overlay style (position, text size/colour, background + opacity, corner radius); motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
-| **Clock Style** | Size (40–400%, independent of the photo-info text size), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing |
-| **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements |
-| **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
+| **Clock** | Show clock, 12h/24h, show current date, position, size (independent of the photo info), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing |
+| **Photo Info** | Field toggles (photo date, location, description, people, camera, rating, person age); position, text size/colour, background + opacity, corner radius; motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
 | **Sleep Schedule** | Enable/disable, start/end hours, dim vs black |
+| **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
 | **Music (Navidrome)** | Server/credentials, enable, cache favourites, max cached songs, Denon host, sync now |
+| **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements — only while music is enabled |
 | **System** | Android Settings, WiFi, Bluetooth |
 
 ## Architecture
