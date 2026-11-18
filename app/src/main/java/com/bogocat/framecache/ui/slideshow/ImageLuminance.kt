@@ -18,18 +18,29 @@ import kotlin.math.max
  * per corner rather than one number for the whole image.
  */
 data class CornerLuminance(
-    val topStart: Float,
-    val topEnd: Float,
-    val bottomStart: Float,
-    val bottomEnd: Float
+    val topStart: CornerSample,
+    val topEnd: CornerSample,
+    val bottomStart: CornerSample,
+    val bottomEnd: CornerSample
 ) {
-    fun forAlignment(alignment: Alignment): Float = when (alignment) {
+    fun forAlignment(alignment: Alignment): CornerSample = when (alignment) {
         Alignment.TopStart -> topStart
         Alignment.TopEnd -> topEnd
         Alignment.BottomEnd -> bottomEnd
         else -> bottomStart
     }
 }
+
+/**
+ * Two readings of one corner band.
+ *
+ * [typical] is the median — what most of the area behind the pill looks like, so a
+ * small bright cloud or a specular highlight does not decide the text colour.
+ * [bright] is the 80th percentile, used as a guard: switching to dark text needs the
+ * corner to be bright *and* broadly so, because dark text dies on any dark patch
+ * behind it while white text (with its shadow) survives most mid-tones.
+ */
+data class CornerSample(val typical: Float, val bright: Float)
 
 /**
  * Downscale the cached photo and measure the brightness of the four corner bands.
@@ -72,7 +83,7 @@ suspend fun sampleCornerLuminance(context: Context, filePath: String?): CornerLu
             val bandW = max(1, (w * 0.45f).toInt())
             val bandH = max(1, (h * 0.30f).toInt())
 
-            fun brightness(x0: Int, y0: Int): Float {
+            fun brightness(x0: Int, y0: Int): CornerSample {
                 val values = ArrayList<Float>(bandW * bandH)
                 for (y in y0 until minOf(y0 + bandH, h)) {
                     for (x in x0 until minOf(x0 + bandW, w)) {
@@ -83,9 +94,12 @@ suspend fun sampleCornerLuminance(context: Context, filePath: String?): CornerLu
                         values.add(0.2126f * r + 0.7152f * g + 0.0722f * b)
                     }
                 }
-                if (values.isEmpty()) return 0.5f
+                if (values.isEmpty()) return CornerSample(0.5f, 0.5f)
                 values.sort()
-                return values[(values.size - 1) * 80 / 100]
+                return CornerSample(
+                    typical = values[(values.size - 1) * 50 / 100],
+                    bright = values[(values.size - 1) * 80 / 100]
+                )
             }
 
             CornerLuminance(

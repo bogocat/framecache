@@ -126,10 +126,12 @@ fun SettingsScreen(
     val clockBackground by settings.clockBackground.collectAsState(initial = SettingsRepository.BACKGROUND_AUTO)
     val clockBackgroundOpacity by settings.clockBackgroundOpacity.collectAsState(initial = 53)
     val clockCornerRadius by settings.clockCornerRadius.collectAsState(initial = 16)
+    val clockAutoBias by settings.clockAutoBias.collectAsState(initial = SettingsRepository.AUTO_BIAS_BALANCED)
     val infoTextColor by settings.infoTextColor.collectAsState(initial = SettingsRepository.TEXT_COLOR_LIGHT)
     val infoBackground by settings.infoBackground.collectAsState(initial = SettingsRepository.BACKGROUND_AUTO)
     val infoBackgroundOpacity by settings.infoBackgroundOpacity.collectAsState(initial = 53)
     val infoCornerRadius by settings.infoCornerRadius.collectAsState(initial = 16)
+    val infoAutoBias by settings.infoAutoBias.collectAsState(initial = SettingsRepository.AUTO_BIAS_BALANCED)
     val clockScale by settings.clockScale.collectAsState(initial = 100)
     val clockFont by settings.clockFont.collectAsState(initial = SettingsRepository.CLOCK_FONT_SANS)
     val clockWeight by settings.clockWeight.collectAsState(initial = SettingsRepository.CLOCK_WEIGHT_LIGHT)
@@ -745,6 +747,17 @@ fun SettingsScreen(
                 ),
                 clockTextColor
             ) { scope.launch { settings.save(SettingsRepository.CLOCK_TEXT_COLOR, it) } }
+            if (clockTextColor == SettingsRepository.TEXT_COLOR_AUTO) {
+                OverlayChoiceRow(
+                    "Auto Contrast",
+                    listOf(
+                        SettingsRepository.AUTO_BIAS_LIGHT.toString() to "Lean light",
+                        SettingsRepository.AUTO_BIAS_BALANCED.toString() to "Balanced",
+                        SettingsRepository.AUTO_BIAS_DARK.toString() to "Lean dark"
+                    ),
+                    clockAutoBias.toString()
+                ) { scope.launch { settings.save(SettingsRepository.CLOCK_AUTO_BIAS, it.toInt()) } }
+            }
             OverlayChoiceRow(
                 "Background",
                 listOf(
@@ -861,6 +874,17 @@ fun SettingsScreen(
                 ),
                 infoTextColor
             ) { scope.launch { settings.save(SettingsRepository.INFO_TEXT_COLOR, it) } }
+            if (infoTextColor == SettingsRepository.TEXT_COLOR_AUTO) {
+                OverlayChoiceRow(
+                    "Auto Contrast",
+                    listOf(
+                        SettingsRepository.AUTO_BIAS_LIGHT.toString() to "Lean light",
+                        SettingsRepository.AUTO_BIAS_BALANCED.toString() to "Balanced",
+                        SettingsRepository.AUTO_BIAS_DARK.toString() to "Lean dark"
+                    ),
+                    infoAutoBias.toString()
+                ) { scope.launch { settings.save(SettingsRepository.INFO_AUTO_BIAS, it.toInt()) } }
+            }
             OverlayChoiceRow(
                 "Background",
                 listOf(

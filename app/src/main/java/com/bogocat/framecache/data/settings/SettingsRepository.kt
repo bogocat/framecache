@@ -88,6 +88,15 @@ class SettingsRepository @Inject constructor(
         const val TEXT_COLOR_DARK = "dark"
         const val TEXT_COLOR_AUTO = "auto"
 
+        // How eagerly AUTO switches to dark text. Dark text only survives on a
+        // broadly bright patch, and white-on-photo is the look people expect, so even
+        // "balanced" asks for more brightness than a plain contrast-ratio would.
+        val CLOCK_AUTO_BIAS = intPreferencesKey("clock_auto_bias")
+        val INFO_AUTO_BIAS = intPreferencesKey("info_auto_bias")
+        const val AUTO_BIAS_LIGHT = 0      // needs a very bright corner to flip
+        const val AUTO_BIAS_BALANCED = 1
+        const val AUTO_BIAS_DARK = 2       // flips on a merely mid-bright corner
+
         // Pill background modes. AUTO is the opposite of the resolved text colour.
         const val BACKGROUND_NONE = "none"
         const val BACKGROUND_DARK = "dark"
@@ -251,6 +260,12 @@ class SettingsRepository @Inject constructor(
     }
     val infoBackgroundOpacity: Flow<Int> = context.dataStore.data.map {
         it[INFO_BACKGROUND_OPACITY] ?: it[OVERLAY_BACKGROUND_OPACITY_LEGACY] ?: 53
+    }
+    val clockAutoBias: Flow<Int> = context.dataStore.data.map {
+        it[CLOCK_AUTO_BIAS] ?: AUTO_BIAS_BALANCED
+    }
+    val infoAutoBias: Flow<Int> = context.dataStore.data.map {
+        it[INFO_AUTO_BIAS] ?: AUTO_BIAS_BALANCED
     }
     val clockCornerRadius: Flow<Int> = context.dataStore.data.map {
         it[CLOCK_CORNER_RADIUS] ?: it[OVERLAY_CORNER_RADIUS_LEGACY] ?: 16

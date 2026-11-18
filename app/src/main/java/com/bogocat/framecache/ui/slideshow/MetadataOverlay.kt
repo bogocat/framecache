@@ -85,29 +85,37 @@ data class OverlayStyle(
 /**
  * Resolve a text-colour setting to "draw white" / "draw black".
  *
- * [auto] is decided per photo from the average brightness of the image under the
- * pill: dark photo -> white text, bright photo -> black text. A tinted pill lightens
- * or darkens that background first, so a 70% black scrim over a bright photo still
- * counts as dark and keeps white text.
+ * [auto] is decided per photo from the brightness of the image under the pill. It
+ * deliberately leans white: white text (with its shadow) reads on almost any
+ * mid-tone, while dark text dies as soon as any part of the background behind it is
+ * dark. So dark text needs the corner to be *broadly* bright — a high median and a
+ * high bright-patch reading both — and [bias] moves how high that bar sits.
  */
 fun resolveLightText(
     mode: String,
-    backgroundLuminance: Float?,
+    sample: CornerSample?,
     background: String,
-    backgroundOpacity: Float
+    backgroundOpacity: Float,
+    bias: Int = SettingsRepository.AUTO_BIAS_BALANCED
 ): Boolean = when (mode) {
     SettingsRepository.TEXT_COLOR_DARK -> false
     SettingsRepository.TEXT_COLOR_LIGHT -> true
     else -> {
-        val lum = backgroundLuminance ?: return true
-        val scrim = when (background) {
-            SettingsRepository.BACKGROUND_NONE -> 0f
-            SettingsRepository.BACKGROUND_DARK -> backgroundOpacity
-            SettingsRepository.BACKGROUND_LIGHT -> -backgroundOpacity
-            else -> 0f // auto scrim flips with the text, so it does not bias the choice
+        val corner = sample ?: return true
+        val (typicalBar, brightBar) = when (bias) {
+            SettingsRepository.AUTO_BIAS_LIGHT -> 0.80f to 0.88f
+            SettingsRepository.AUTO_BIAS_DARK -> 0.58f to 0.66f
+            else -> 0.72f to 0.82f
         }
-        val effective = if (scrim >= 0f) lum * (1f - scrim) else lum + (1f - lum) * (-scrim)
-        effective < 0.55f
+        // A fixed scrim moves the background first; an auto scrim flips with the text,
+        // so it must not bias the choice.
+        fun underScrim(v: Float): Float = when (background) {
+            SettingsRepository.BACKGROUND_DARK -> v * (1f - backgroundOpacity)
+            SettingsRepository.BACKGROUND_LIGHT -> v + (1f - v) * backgroundOpacity
+            else -> v
+        }
+        // White unless the corner is decisively bright and broadly so.
+        !(underScrim(corner.typical) > typicalBar && underScrim(corner.bright) > brightBar)
     }
 }
 

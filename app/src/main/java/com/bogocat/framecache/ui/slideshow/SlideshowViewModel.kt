@@ -63,10 +63,12 @@ class SlideshowViewModel @Inject constructor(
     val clockBackground = settings.clockBackground.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.BACKGROUND_AUTO)
     val clockBackgroundOpacity = settings.clockBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
     val clockCornerRadius = settings.clockCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+    val clockAutoBias = settings.clockAutoBias.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.AUTO_BIAS_BALANCED)
     val infoTextColor = settings.infoTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.TEXT_COLOR_LIGHT)
     val infoBackground = settings.infoBackground.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.BACKGROUND_AUTO)
     val infoBackgroundOpacity = settings.infoBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
     val infoCornerRadius = settings.infoCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+    val infoAutoBias = settings.infoAutoBias.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.AUTO_BIAS_BALANCED)
 
     // Clock styling — independent of the photo-info overlay's text size.
     val clockScale = settings.clockScale.stateIn(viewModelScope, SharingStarted.Eagerly, 100)

@@ -86,10 +86,12 @@ fun SlideshowScreen(
     val clockBackground by viewModel.clockBackground.collectAsState()
     val clockBackgroundOpacity by viewModel.clockBackgroundOpacity.collectAsState()
     val clockCornerRadius by viewModel.clockCornerRadius.collectAsState()
+    val clockAutoBias by viewModel.clockAutoBias.collectAsState()
     val infoTextColor by viewModel.infoTextColor.collectAsState()
     val infoBackground by viewModel.infoBackground.collectAsState()
     val infoBackgroundOpacity by viewModel.infoBackgroundOpacity.collectAsState()
     val infoCornerRadius by viewModel.infoCornerRadius.collectAsState()
+    val infoAutoBias by viewModel.infoAutoBias.collectAsState()
     val clockScale by viewModel.clockScale.collectAsState()
     val clockFont by viewModel.clockFont.collectAsState()
     val clockWeight by viewModel.clockWeight.collectAsState()
@@ -142,8 +144,12 @@ fun SlideshowScreen(
     // pill, since each resolves its own colour and background.
     val infoLuminance = luminance?.forAlignment(infoAlignment)
     val clockLuminance = luminance?.forAlignment(clockAlignment)
-    val clockLight = resolveLightText(clockTextColor, clockLuminance, clockBackground, clockBackgroundOpacity / 100f)
-    val infoLight = resolveLightText(infoTextColor, infoLuminance, infoBackground, infoBackgroundOpacity / 100f)
+    val clockLight = resolveLightText(
+        clockTextColor, clockLuminance, clockBackground, clockBackgroundOpacity / 100f, clockAutoBias
+    )
+    val infoLight = resolveLightText(
+        infoTextColor, infoLuminance, infoBackground, infoBackgroundOpacity / 100f, infoAutoBias
+    )
     val clockPillStyle = OverlayStyle(
         scale = 1f,
         light = clockLight,
