@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +57,11 @@ import com.bogocat.framecache.data.cache.ImageCacheManager
 import com.bogocat.framecache.data.settings.SettingsRepository
 import com.bogocat.framecache.music.MusicPlayer
 import com.bogocat.framecache.sync.SyncScheduler
+import com.bogocat.framecache.ui.slideshow.ClockStyle
+import com.bogocat.framecache.ui.slideshow.OverlayAnimation
+import com.bogocat.framecache.ui.slideshow.OverlayStyle
 import com.bogocat.framecache.ui.slideshow.clockFontFamily
+import com.bogocat.framecache.ui.slideshow.overlayAlignment
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -104,6 +109,7 @@ fun SettingsScreen(
     val favoritesOnly by settings.favoritesOnly.collectAsState(initial = false)
     val orientationMode by settings.orientationMode.collectAsState(initial = SettingsRepository.ORIENTATION_MATCH_PAIR)
     val clockFormat by settings.clockFormat.collectAsState(initial = "12")
+    val dateFormat by settings.dateFormat.collectAsState(initial = "MMM dd, yyyy")
     val showRating by settings.showRating.collectAsState(initial = false)
     val showPersonAge by settings.showPersonAge.collectAsState(initial = false)
     val showClock by settings.showClock.collectAsState(initial = true)
@@ -113,7 +119,7 @@ fun SettingsScreen(
     val showDescription by settings.showDescription.collectAsState(initial = true)
     val showPeople by settings.showPeople.collectAsState(initial = false)
     val showCamera by settings.showCamera.collectAsState(initial = false)
-    val overlayTextSize by settings.overlayTextSize.collectAsState(initial = "medium")
+    val overlayScale by settings.overlayScale.collectAsState(initial = 100)
     val overlayTextColor by settings.overlayTextColor.collectAsState(initial = "light")
     val overlayBackground by settings.overlayBackground.collectAsState(initial = true)
     val overlayBackgroundOpacity by settings.overlayBackgroundOpacity.collectAsState(initial = 53)
@@ -124,6 +130,7 @@ fun SettingsScreen(
     val clockFont by settings.clockFont.collectAsState(initial = SettingsRepository.CLOCK_FONT_SANS)
     val clockWeight by settings.clockWeight.collectAsState(initial = SettingsRepository.CLOCK_WEIGHT_LIGHT)
     val clockLetterSpacing by settings.clockLetterSpacing.collectAsState(initial = 0)
+
     val overlayAnimation by settings.overlayAnimation.collectAsState(initial = SettingsRepository.OVERLAY_ANIM_STATIC)
     val overlayMarquee by settings.overlayMarquee.collectAsState(initial = false)
     val overlayExpandScale by settings.overlayExpandScale.collectAsState(initial = 130)
@@ -133,6 +140,30 @@ fun SettingsScreen(
     val overlayExpandedIndefinite by settings.overlayExpandedIndefinite.collectAsState(initial = false)
     val overlayCollapsedIndefinite by settings.overlayCollapsedIndefinite.collectAsState(initial = false)
     val overlayCollapsedFields by settings.overlayCollapsedFields.collectAsState(initial = setOf(SettingsRepository.OVERLAY_FIELD_DATE))
+
+    // Live miniature of the frame: the overlay styles rebuilt from the settings that
+    // are still being edited, so the previews update as the sliders move.
+    val deviceConfig = LocalConfiguration.current
+    val deviceWidthDp = deviceConfig.screenWidthDp
+    val deviceHeightDp = deviceConfig.screenHeightDp
+    val previewStyle = OverlayStyle(
+        scale = 1f, // per-overlay scale is passed separately to each preview
+        light = overlayTextColor != "dark",
+        showBackground = overlayBackground,
+        backgroundOpacity = overlayBackgroundOpacity / 100f,
+        cornerRadius = overlayCornerRadius
+    )
+    val previewClockStyle = ClockStyle(
+        scale = clockScale / 100f,
+        font = clockFont,
+        weight = clockWeight,
+        letterSpacing = clockLetterSpacing / 10f
+    )
+    val previewAnimation = OverlayAnimation(
+        mode = overlayAnimation,
+        expandedScale = overlayExpandScale / 100f,
+        collapsedScale = overlayCollapsedScale / 100f
+    )
     val npShowArt by settings.npShowArt.collectAsState(initial = true)
     val npShowTitle by settings.npShowTitle.collectAsState(initial = true)
     val npShowArtist by settings.npShowArtist.collectAsState(initial = true)
@@ -619,6 +650,30 @@ fun SettingsScreen(
         val clockShown = showClock || showDate
         if (clockShown) {
             SubHeading("Look")
+            // Live miniature of the frame so size/font choices are visible without
+            // saving and leaving settings.
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(bottom = 4.dp)
+            ) {
+                ClockPreview(
+                    deviceWidthDp = deviceWidthDp,
+                    deviceHeightDp = deviceHeightDp,
+                    alignment = overlayAlignment(overlayClockPosition),
+                    style = previewStyle,
+                    clock = previewClockStyle,
+                    clockFormat = clockFormat,
+                    dateFormat = dateFormat,
+                    showDate = showDate
+                )
+                PreviewCaption(
+                    title = "Preview",
+                    detail = clockSizeLabel(clockScale) + " \u00B7 " + clockFontLabel(clockFont) +
+                        " " + clockWeight.replaceFirstChar { it.uppercaseChar() },
+                    note = "Pill size and position relative to the whole frame."
+                )
+            }
             OverlayPositionRow("Position", overlayClockPosition) {
                 scope.launch { settings.save(SettingsRepository.OVERLAY_CLOCK_POSITION, it) }
             }
@@ -647,7 +702,13 @@ fun SettingsScreen(
                 fontFor = { clockFontFamily(clockFont, clockWeight) }
             ) { scope.launch { settings.save(SettingsRepository.CLOCK_WEIGHT, it) } }
 
-            SliderSetting("Size", clockScale.toFloat(), 40f..400f, "%") {
+            SliderSetting(
+                "Size",
+                clockScale.toFloat(),
+                50f..400f,
+                "",
+                format = { clockSizeLabel(it.roundToInt()) }
+            ) {
                 scope.launch { settings.save(SettingsRepository.CLOCK_SCALE, it.roundToInt()) }
             }
             SliderSetting(
@@ -697,14 +758,51 @@ fun SettingsScreen(
             HintText("No fields selected — the photo info pill stays hidden.")
         } else {
             SubHeading("Look")
+            // Miniature of the frame with only the enabled fields, so the size and
+            // expansion controls can be judged without leaving settings.
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(bottom = 4.dp)
+            ) {
+                PhotoInfoPreview(
+                    deviceWidthDp = deviceWidthDp,
+                    deviceHeightDp = deviceHeightDp,
+                    alignment = overlayAlignment(overlayInfoPosition),
+                    style = previewStyle,
+                    scale = overlayScale / 100f,
+                    animation = previewAnimation,
+                    lines = previewLines(
+                        photoDate = showPhotoDate,
+                        location = showLocation,
+                        description = showDescription,
+                        people = showPeople,
+                        personAge = showPersonAge,
+                        camera = showCamera,
+                        rating = showRating,
+                        dateFormat = dateFormat
+                    )
+                )
+                PreviewCaption(
+                    title = "Preview",
+                    detail = infoScaleLabel(overlayScale) + " \u00B7 date line " +
+                        "${(15f * overlayScale / 100f).roundToInt()} sp",
+                    note = if (previewAnimation.enabled)
+                        "Expanded state shown \u2014 the largest the pill gets."
+                    else
+                        "Each line scaled from its own default size."
+                )
+            }
             OverlayPositionRow("Position", overlayInfoPosition) {
                 scope.launch { settings.save(SettingsRepository.OVERLAY_INFO_POSITION, it) }
             }
-            OverlayChoiceRow(
-                "Text Size",
-                listOf("small" to "Small", "medium" to "Medium", "large" to "Large"),
-                overlayTextSize
-            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_TEXT_SIZE, it) } }
+            SliderSetting(
+                "Size",
+                overlayScale.toFloat(),
+                50f..400f,
+                "",
+                format = { infoScaleLabel(it.roundToInt()) }
+            ) { scope.launch { settings.save(SettingsRepository.OVERLAY_SCALE, it.roundToInt()) } }
             OverlayChoiceRow(
                 "Text Color",
                 listOf("light" to "Light", "dark" to "Dark"),
@@ -748,10 +846,18 @@ fun SettingsScreen(
                     modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
                 )
 
-                SliderSetting("Expanded Size", overlayExpandScale.toFloat(), 50f..200f, "%") {
+                SliderSetting(
+                    "Expanded",
+                    overlayExpandScale.toFloat(), 50f..300f, "",
+                    format = { "\u00D7%.1f".format(it / 100f) }
+                ) {
                     scope.launch { settings.save(SettingsRepository.OVERLAY_EXPAND_SCALE, it.roundToInt()) }
                 }
-                SliderSetting("Collapsed Size", overlayCollapsedScale.toFloat(), 50f..200f, "%") {
+                SliderSetting(
+                    "Collapsed",
+                    overlayCollapsedScale.toFloat(), 50f..300f, "",
+                    format = { "\u00D7%.1f".format(it / 100f) }
+                ) {
                     scope.launch { settings.save(SettingsRepository.OVERLAY_COLLAPSED_SCALE, it.roundToInt()) }
                 }
 
@@ -1123,10 +1229,18 @@ fun SettingsScreen(
                 SettingsToggle("Artist", npShowArtist) { scope.launch { settings.save(SettingsRepository.NP_SHOW_ARTIST, it) } }
                 SettingsToggle("Play / Skip Controls", npShowControls) { scope.launch { settings.save(SettingsRepository.NP_SHOW_CONTROLS, it) } }
 
-                SliderSetting("Expanded Size", npExpandedScale.toFloat(), 50f..200f, "%") {
+                SliderSetting(
+                    "Expanded",
+                    npExpandedScale.toFloat(), 50f..300f, "",
+                    format = { "\u00D7%.1f".format(it / 100f) }
+                ) {
                     scope.launch { settings.save(SettingsRepository.NP_EXPANDED_SCALE, it.roundToInt()) }
                 }
-                SliderSetting("Collapsed Size", npCollapsedScale.toFloat(), 50f..200f, "%") {
+                SliderSetting(
+                    "Collapsed",
+                    npCollapsedScale.toFloat(), 50f..300f, "",
+                    format = { "\u00D7%.1f".format(it / 100f) }
+                ) {
                     scope.launch { settings.save(SettingsRepository.NP_COLLAPSED_SCALE, it.roundToInt()) }
                 }
                 SliderSetting("Background Opacity", npBackgroundOpacity.toFloat(), 0f..100f, "%") {

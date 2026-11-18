@@ -85,8 +85,8 @@ Swipe down or long-press on the slideshow to open settings. Sections are collaps
 | **Server Connection** | Server URL, API key, album IDs |
 | **Photo Sources** | Immich albums, local folder |
 | **Slideshow** | Photo duration (presets + custom, 1s–24h), crossfade, Ken Burns + zoom, background blur, fill vs fit, progress bar, order, favourites only, photo orientation |
-| **Clock** | Show clock, 12h/24h, show current date, position, size (independent of the photo info), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing |
-| **Photo Info** | Field toggles (photo date, location, description, people, camera, rating, person age); position, text size/colour, background + opacity, corner radius; motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
+| **Clock** | Show clock, 12h/24h, show current date, position, size (in sp, with a live preview of the frame), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing |
+| **Photo Info** | Field toggles (photo date, location, description, people, camera, rating, person age); position, size (a multiplier on each line's default, with a live preview), text colour, background + opacity, corner radius; motion (collapse mode, expanded/collapsed ratios, holds, collapsed fields, marquee) |
 | **Sleep Schedule** | Enable/disable, start/end hours, dim vs black |
 | **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
 | **Music (Navidrome)** | Server/credentials, enable, cache favourites, max cached songs, Denon host, sync now |

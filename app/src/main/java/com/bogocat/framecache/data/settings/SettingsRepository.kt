@@ -60,7 +60,9 @@ class SettingsRepository @Inject constructor(
         val DATE_FORMAT = stringPreferencesKey("date_format")
 
         // Overlay presentation
-        val OVERLAY_TEXT_SIZE = stringPreferencesKey("overlay_text_size")
+        // Superseded by OVERLAY_SCALE; only read to migrate old installs' preset choice.
+        val OVERLAY_TEXT_SIZE_LEGACY = stringPreferencesKey("overlay_text_size")
+        val OVERLAY_SCALE = intPreferencesKey("overlay_scale")
         val OVERLAY_TEXT_COLOR = stringPreferencesKey("overlay_text_color")
         val OVERLAY_BACKGROUND = booleanPreferencesKey("overlay_background")
         val OVERLAY_BACKGROUND_OPACITY = intPreferencesKey("overlay_background_opacity")
@@ -196,7 +198,15 @@ class SettingsRepository @Inject constructor(
     val dateFormat: Flow<String> = context.dataStore.data.map { it[DATE_FORMAT] ?: "MMM dd, yyyy" }
 
     // Overlay presentation
-    val overlayTextSize: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_SIZE] ?: "medium" }
+    // The photo info used to be three presets (small/medium/large). It is now a
+    // continuous scale like the clock, so old values are read once and converted.
+    val overlayScale: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[OVERLAY_SCALE] ?: when (prefs[OVERLAY_TEXT_SIZE_LEGACY]) {
+            "small" -> 85
+            "large" -> 130
+            else -> 100
+        }
+    }
     val overlayTextColor: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_COLOR] ?: "light" }
     val overlayBackground: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_BACKGROUND] ?: true }
     val overlayBackgroundOpacity: Flow<Int> = context.dataStore.data.map { it[OVERLAY_BACKGROUND_OPACITY] ?: 53 }

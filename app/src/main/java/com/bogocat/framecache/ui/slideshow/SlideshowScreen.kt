@@ -78,7 +78,7 @@ fun SlideshowScreen(
     val showRating by viewModel.showRating.collectAsState()
     val showPersonAge by viewModel.showPersonAge.collectAsState()
     val clockFormat by viewModel.clockFormat.collectAsState()
-    val overlayTextSize by viewModel.overlayTextSize.collectAsState()
+    val overlayScale by viewModel.overlayScale.collectAsState()
     val overlayTextColor by viewModel.overlayTextColor.collectAsState()
     val overlayBackground by viewModel.overlayBackground.collectAsState()
     val overlayBackgroundOpacity by viewModel.overlayBackgroundOpacity.collectAsState()
@@ -121,11 +121,7 @@ fun SlideshowScreen(
 
     // Overlay presentation, assembled from the user's style options.
     val overlayStyle = OverlayStyle(
-        scale = when (overlayTextSize) {
-            "small" -> 0.85f
-            "large" -> 1.3f
-            else -> 1f
-        },
+        scale = overlayScale / 100f,
         light = overlayTextColor != "dark",
         showBackground = overlayBackground,
         backgroundOpacity = overlayBackgroundOpacity / 100f,

@@ -53,7 +53,7 @@ class SlideshowViewModel @Inject constructor(
     val clockFormat = settings.clockFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "12")
 
     // Overlay presentation
-    val overlayTextSize = settings.overlayTextSize.stateIn(viewModelScope, SharingStarted.Eagerly, "medium")
+    val overlayScale = settings.overlayScale.stateIn(viewModelScope, SharingStarted.Eagerly, 100)
     val overlayTextColor = settings.overlayTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, "light")
     val overlayBackground = settings.overlayBackground.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val overlayBackgroundOpacity = settings.overlayBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
