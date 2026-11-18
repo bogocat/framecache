@@ -85,6 +85,10 @@ fun SlideshowScreen(
     val overlayClockPosition by viewModel.overlayClockPosition.collectAsState()
     val overlayInfoPosition by viewModel.overlayInfoPosition.collectAsState()
     val overlayCornerRadius by viewModel.overlayCornerRadius.collectAsState()
+    val clockScale by viewModel.clockScale.collectAsState()
+    val clockFont by viewModel.clockFont.collectAsState()
+    val clockWeight by viewModel.clockWeight.collectAsState()
+    val clockLetterSpacing by viewModel.clockLetterSpacing.collectAsState()
     val overlayAnimationMode by viewModel.overlayAnimation.collectAsState()
     val overlayMarquee by viewModel.overlayMarquee.collectAsState()
     val overlayExpandScale by viewModel.overlayExpandScale.collectAsState()
@@ -128,6 +132,14 @@ fun SlideshowScreen(
         cornerRadius = overlayCornerRadius
     )
     val clockAlignment = remember(overlayClockPosition) { overlayAlignment(overlayClockPosition) }
+    val clockStyle = remember(clockScale, clockFont, clockWeight, clockLetterSpacing) {
+        ClockStyle(
+            scale = clockScale / 100f,
+            font = clockFont,
+            weight = clockWeight,
+            letterSpacing = clockLetterSpacing / 10f
+        )
+    }
     val infoAlignment = remember(overlayInfoPosition) { overlayAlignment(overlayInfoPosition) }
     val overlayAnimation = OverlayAnimation(
         mode = overlayAnimationMode,
@@ -321,7 +333,8 @@ fun SlideshowScreen(
                 clockFormat = clockFormat,
                 dateFormat = dateFormat,
                 alignment = clockAlignment,
-                style = overlayStyle
+                style = overlayStyle,
+                clock = clockStyle
             )
 
             // Progress bar

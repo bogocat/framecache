@@ -28,6 +28,7 @@ FrameCache: Device app ←—reads local disk—→ [cached JPEGs + Room DB]
 - **Background blur** — blurred version of the photo behind the main image
 - **Metadata overlays** — clock, date, photo date, location, description, people, camera, rating, person age
 - **Overlay styling & motion** — independent expanded/collapsed sizes, corner position, text size/colour, background opacity, corner radius, marquee for long lines, and a Static/Loop/Once expand-collapse cycle
+- **Independent clock style** — the clock (and the date under it) is sized separately from the photo info, with its own font family (sans / serif / condensed / mono), weight, and letter spacing, so it can be a large statement piece while the info stays small
 - **Music (Navidrome)** — browse artists → albums → songs, cache favourites / playlists / individual songs offline, with a configurable now-playing pill over the slideshow
 - **Cast to Denon** — stream playback to a Denon/HEOS receiver over DLNA (the receiver pulls the stream directly); accurate progress + seeking
 - **Sleep schedule** — dim or black screen during configurable hours
@@ -85,6 +86,7 @@ Swipe down or long-press on the slideshow to open settings.
 | **Photo Sources** | Immich albums, local folder |
 | **Slideshow** | Photo duration (presets + custom, 1s–24h), crossfade, Ken Burns + zoom, background blur, fill vs fit, progress bar, order, favourites only, photo orientation |
 | **Overlays** | Show toggles (clock, date, photo date, location, description, people, camera, rating, age); overlay style (position, text size/colour, background + opacity, corner radius); motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
+| **Clock Style** | Size (40–400%, independent of the photo-info text size), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing |
 | **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements |
 | **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
 | **Sleep Schedule** | Enable/disable, start/end hours, dim vs black |

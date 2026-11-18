@@ -61,6 +61,12 @@ class SlideshowViewModel @Inject constructor(
     val overlayInfoPosition = settings.overlayInfoPosition.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_POS_BOTTOM_START)
     val overlayCornerRadius = settings.overlayCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
 
+    // Clock styling — independent of the photo-info overlay's text size.
+    val clockScale = settings.clockScale.stateIn(viewModelScope, SharingStarted.Eagerly, 100)
+    val clockFont = settings.clockFont.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CLOCK_FONT_SANS)
+    val clockWeight = settings.clockWeight.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CLOCK_WEIGHT_LIGHT)
+    val clockLetterSpacing = settings.clockLetterSpacing.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     // Now-playing pill
     val npShowArt = settings.npShowArt.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val npShowTitle = settings.npShowTitle.stateIn(viewModelScope, SharingStarted.Eagerly, true)

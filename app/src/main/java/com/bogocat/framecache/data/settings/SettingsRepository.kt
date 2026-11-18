@@ -77,6 +77,26 @@ class SettingsRepository @Inject constructor(
         val OVERLAY_COLLAPSED_INDEFINITE = booleanPreferencesKey("overlay_collapsed_indefinite")
         val OVERLAY_COLLAPSED_FIELDS = stringPreferencesKey("overlay_collapsed_fields")
 
+        // Clock styling: the clock pill is sized and styled independently of the
+        // photo-info pill, so it can be much larger and use a different face.
+        val CLOCK_SCALE = intPreferencesKey("clock_scale")
+        val CLOCK_FONT = stringPreferencesKey("clock_font")
+        val CLOCK_WEIGHT = stringPreferencesKey("clock_weight")
+        val CLOCK_LETTER_SPACING = intPreferencesKey("clock_letter_spacing")
+
+        // Clock font families
+        const val CLOCK_FONT_SANS = "sans"
+        const val CLOCK_FONT_SERIF = "serif"
+        const val CLOCK_FONT_MONO = "mono"
+        const val CLOCK_FONT_CONDENSED = "condensed"
+
+        // Clock font weights
+        const val CLOCK_WEIGHT_THIN = "thin"
+        const val CLOCK_WEIGHT_LIGHT = "light"
+        const val CLOCK_WEIGHT_NORMAL = "normal"
+        const val CLOCK_WEIGHT_MEDIUM = "medium"
+        const val CLOCK_WEIGHT_BOLD = "bold"
+
         // Overlay position values
         const val OVERLAY_POS_TOP_START = "top_start"
         const val OVERLAY_POS_TOP_END = "top_end"
@@ -183,6 +203,13 @@ class SettingsRepository @Inject constructor(
     val overlayClockPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_CLOCK_POSITION] ?: OVERLAY_POS_TOP_START }
     val overlayInfoPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_INFO_POSITION] ?: OVERLAY_POS_BOTTOM_START }
     val overlayCornerRadius: Flow<Int> = context.dataStore.data.map { it[OVERLAY_CORNER_RADIUS] ?: 16 }
+
+    // Clock styling (independent of the photo-info overlay)
+    val clockScale: Flow<Int> = context.dataStore.data.map { it[CLOCK_SCALE] ?: 100 }
+    val clockFont: Flow<String> = context.dataStore.data.map { it[CLOCK_FONT] ?: CLOCK_FONT_SANS }
+    val clockWeight: Flow<String> = context.dataStore.data.map { it[CLOCK_WEIGHT] ?: CLOCK_WEIGHT_LIGHT }
+    // Letter spacing in tenths of an sp (negative tightens, positive opens up).
+    val clockLetterSpacing: Flow<Int> = context.dataStore.data.map { it[CLOCK_LETTER_SPACING] ?: 0 }
     val overlayAnimation: Flow<String> = context.dataStore.data.map {
         when (it[OVERLAY_ANIMATION]) {
             null -> OVERLAY_ANIM_STATIC

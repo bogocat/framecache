@@ -1,5 +1,6 @@
 package com.bogocat.framecache.ui.slideshow
 
+import android.graphics.Typeface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -95,6 +97,55 @@ data class OverlayAnimation(
 
 private data class OverlayLine(val id: String, val text: String, val color: Color, val baseSp: Int)
 
+/**
+ * Independent styling for the clock pill. The clock gets its own size, font family,
+ * weight and letter spacing so it can be a large statement piece while the photo
+ * info stays small (or vice versa) — the two pills no longer share one text size.
+ */
+data class ClockStyle(
+    val scale: Float = 1f,
+    val font: String = SettingsRepository.CLOCK_FONT_SANS,
+    val weight: String = SettingsRepository.CLOCK_WEIGHT_LIGHT,
+    val letterSpacing: Float = 0f // sp
+) {
+    val fontFamily: FontFamily get() = clockFontFamily(font, weight)
+
+    /** Time size in sp; base 22sp at 100%. */
+    fun timeSize(): TextUnit = (22f * scale).sp
+
+    /** Date line that sits under the clock; base 13sp at 100%. */
+    fun dateSize(): TextUnit = (13f * scale).sp
+}
+
+/**
+ * Resolve a font family + weight to a Compose [FontFamily].
+ *
+ * Android exposes weights as separate system family names ("sans-serif-light",
+ * "sans-serif-medium", …) rather than a numeric axis, so we pick the family name
+ * that matches both. Serif and monospace have no light/thin variants here, so for
+ * those only the bold flag applies — otherwise the platform would silently fall
+ * back to the default sans-serif face.
+ */
+fun clockFontFamily(font: String, weight: String): FontFamily {
+    val base = when (font) {
+        SettingsRepository.CLOCK_FONT_SERIF -> "serif"
+        SettingsRepository.CLOCK_FONT_MONO -> "monospace"
+        SettingsRepository.CLOCK_FONT_CONDENSED -> "sans-serif-condensed"
+        else -> "sans-serif"
+    }
+    val hasWeightVariants = font != SettingsRepository.CLOCK_FONT_SERIF &&
+        font != SettingsRepository.CLOCK_FONT_MONO
+    val suffix = when (weight) {
+        SettingsRepository.CLOCK_WEIGHT_THIN -> "thin"
+        SettingsRepository.CLOCK_WEIGHT_LIGHT -> "light"
+        SettingsRepository.CLOCK_WEIGHT_MEDIUM -> "medium"
+        else -> null
+    }
+    val name = if (suffix != null && hasWeightVariants) "$base-$suffix" else base
+    val bold = weight == SettingsRepository.CLOCK_WEIGHT_BOLD
+    return FontFamily(Typeface.create(name, if (bold) Typeface.BOLD else Typeface.NORMAL))
+}
+
 fun overlayAlignment(value: String): Alignment = when (value) {
     SettingsRepository.OVERLAY_POS_TOP_START -> Alignment.TopStart
     SettingsRepository.OVERLAY_POS_TOP_END -> Alignment.TopEnd
@@ -120,11 +171,14 @@ fun MetadataOverlay(
     dateFormat: String,
     alignment: Alignment = Alignment.TopStart,
     style: OverlayStyle = OverlayStyle(),
+    clock: ClockStyle = ClockStyle(),
     modifier: Modifier = Modifier
 ) {
     if (!showClock && !showDate) return
 
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    // Resolve the typeface once per font/weight change rather than on every tick.
+    val clockFont = remember(clock.font, clock.weight) { clock.fontFamily }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -142,8 +196,12 @@ fun MetadataOverlay(
                         text = SimpleDateFormat(clockFmt, Locale.getDefault())
                             .format(Date(currentTime)),
                         color = style.primary,
-                        fontSize = style.size(22),
-                        fontWeight = FontWeight.Light,
+                        fontSize = clock.timeSize(),
+                        fontFamily = clockFont,
+                        letterSpacing = clock.letterSpacing.sp,
+                        // A big clock must never wrap onto a second line.
+                        maxLines = 1,
+                        softWrap = false,
                         style = LocalTextStyle.current.copy(shadow = style.shadow)
                     )
                 }
@@ -151,7 +209,10 @@ fun MetadataOverlay(
                     Text(
                         text = formatDate(dateFormat, currentTime),
                         color = style.secondary,
-                        fontSize = style.size(13),
+                        fontSize = clock.dateSize(),
+                        fontFamily = clockFont,
+                        maxLines = 1,
+                        softWrap = false,
                         style = LocalTextStyle.current.copy(shadow = style.shadow)
                     )
                 }

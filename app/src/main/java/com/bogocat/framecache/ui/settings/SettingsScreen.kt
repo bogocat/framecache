@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ import com.bogocat.framecache.data.cache.ImageCacheManager
 import com.bogocat.framecache.data.settings.SettingsRepository
 import com.bogocat.framecache.music.MusicPlayer
 import com.bogocat.framecache.sync.SyncScheduler
+import com.bogocat.framecache.ui.slideshow.clockFontFamily
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -118,6 +120,10 @@ fun SettingsScreen(
     val overlayClockPosition by settings.overlayClockPosition.collectAsState(initial = SettingsRepository.OVERLAY_POS_TOP_START)
     val overlayInfoPosition by settings.overlayInfoPosition.collectAsState(initial = SettingsRepository.OVERLAY_POS_BOTTOM_START)
     val overlayCornerRadius by settings.overlayCornerRadius.collectAsState(initial = 16)
+    val clockScale by settings.clockScale.collectAsState(initial = 100)
+    val clockFont by settings.clockFont.collectAsState(initial = SettingsRepository.CLOCK_FONT_SANS)
+    val clockWeight by settings.clockWeight.collectAsState(initial = SettingsRepository.CLOCK_WEIGHT_LIGHT)
+    val clockLetterSpacing by settings.clockLetterSpacing.collectAsState(initial = 0)
     val overlayAnimation by settings.overlayAnimation.collectAsState(initial = SettingsRepository.OVERLAY_ANIM_STATIC)
     val overlayMarquee by settings.overlayMarquee.collectAsState(initial = false)
     val overlayExpandScale by settings.overlayExpandScale.collectAsState(initial = 130)
@@ -602,6 +608,58 @@ fun SettingsScreen(
 
         OverlayPositionRow("Clock Position", overlayClockPosition) {
             scope.launch { settings.save(SettingsRepository.OVERLAY_CLOCK_POSITION, it) }
+        }
+
+        Text(
+            "Clock Style",
+            color = subtextColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+        )
+        Text(
+            "The clock and the current date are sized and styled separately from the photo info below.",
+            color = subtextColor,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+
+        OverlayChoiceBlock(
+            "Font",
+            listOf(
+                SettingsRepository.CLOCK_FONT_SANS to "Sans",
+                SettingsRepository.CLOCK_FONT_SERIF to "Serif",
+                SettingsRepository.CLOCK_FONT_CONDENSED to "Condensed",
+                SettingsRepository.CLOCK_FONT_MONO to "Mono"
+            ),
+            clockFont,
+            fontFor = { clockFontFamily(it, clockWeight) }
+        ) { scope.launch { settings.save(SettingsRepository.CLOCK_FONT, it) } }
+
+        OverlayChoiceBlock(
+            "Weight",
+            listOf(
+                SettingsRepository.CLOCK_WEIGHT_THIN to "Thin",
+                SettingsRepository.CLOCK_WEIGHT_LIGHT to "Light",
+                SettingsRepository.CLOCK_WEIGHT_NORMAL to "Regular",
+                SettingsRepository.CLOCK_WEIGHT_MEDIUM to "Medium",
+                SettingsRepository.CLOCK_WEIGHT_BOLD to "Bold"
+            ),
+            clockWeight,
+            fontFor = { clockFontFamily(clockFont, clockWeight) }
+        ) { scope.launch { settings.save(SettingsRepository.CLOCK_WEIGHT, it) } }
+
+        SliderSetting("Clock Size", clockScale.toFloat(), 40f..400f, "%") {
+            scope.launch { settings.save(SettingsRepository.CLOCK_SCALE, it.roundToInt()) }
+        }
+        SliderSetting(
+            "Letter Spacing",
+            clockLetterSpacing.toFloat(),
+            -20f..80f,
+            "",
+            format = { "%.1f sp".format(it / 10f) }
+        ) {
+            scope.launch { settings.save(SettingsRepository.CLOCK_LETTER_SPACING, it.roundToInt()) }
         }
         OverlayPositionRow("Photo Info Position", overlayInfoPosition) {
             scope.launch { settings.save(SettingsRepository.OVERLAY_INFO_POSITION, it) }
@@ -1296,6 +1354,43 @@ private fun OverlayPositionRow(label: String, value: String, onSelect: (String) 
 }
 
 @Composable
+private fun OverlayChoiceBlock(
+    label: String,
+    options: List<Pair<String, String>>,
+    value: String,
+    perRow: Int = 3,
+    fontFor: ((String) -> FontFamily)? = null,
+    onSelect: (String) -> Unit
+) {
+    Text(label, color = textColor, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+    options.chunked(perRow).forEach { rowOptions ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 6.dp)
+        ) {
+            rowOptions.forEach { (optionValue, optionLabel) ->
+                val selected = value == optionValue
+                OutlinedButton(
+                    onClick = { onSelect(optionValue) },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (selected) Color.Black else textColor,
+                        containerColor = if (selected) sectionColor else Color.Transparent
+                    ),
+                    modifier = Modifier.height(34.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        optionLabel,
+                        fontSize = 13.sp,
+                        fontFamily = fontFor?.invoke(optionValue)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun OverlayChoiceRow(
     label: String,
     options: List<Pair<String, String>>,
@@ -1364,13 +1459,14 @@ private fun formatDuration(seconds: Int): String {
 private fun SliderSetting(
     label: String, value: Float, range: ClosedFloatingPointRange<Float>,
     unit: String, steps: Int = 0,
+    format: ((Float) -> String)? = null,
     onValueChangeFinished: (() -> Unit)? = null,
     onValueChange: (Float) -> Unit
 ) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, color = textColor, fontSize = 15.sp)
-            Text("${value.roundToInt()}$unit", color = subtextColor, fontSize = 14.sp)
+            Text(format?.invoke(value) ?: "${value.roundToInt()}$unit", color = subtextColor, fontSize = 14.sp)
         }
         Slider(
             value = value, onValueChange = onValueChange, valueRange = range, steps = steps,
