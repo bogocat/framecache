@@ -60,13 +60,48 @@ class SettingsRepository @Inject constructor(
         val DATE_FORMAT = stringPreferencesKey("date_format")
 
         // Overlay presentation
-        val OVERLAY_TEXT_SIZE = stringPreferencesKey("overlay_text_size")
-        val OVERLAY_TEXT_COLOR = stringPreferencesKey("overlay_text_color")
-        val OVERLAY_BACKGROUND = booleanPreferencesKey("overlay_background")
-        val OVERLAY_BACKGROUND_OPACITY = intPreferencesKey("overlay_background_opacity")
+        // Superseded by OVERLAY_SCALE; only read to migrate old installs' preset choice.
+        val OVERLAY_TEXT_SIZE_LEGACY = stringPreferencesKey("overlay_text_size")
+        val OVERLAY_SCALE = intPreferencesKey("overlay_scale")
         val OVERLAY_CLOCK_POSITION = stringPreferencesKey("overlay_clock_position")
         val OVERLAY_INFO_POSITION = stringPreferencesKey("overlay_info_position")
-        val OVERLAY_CORNER_RADIUS = intPreferencesKey("overlay_corner_radius")
+
+        // Per-pill presentation. The clock and the photo info sit in different corners
+        // over different parts of the photo, so each carries its own colour, background
+        // and radius. The shared keys below are only read, to migrate pre-split values.
+        val CLOCK_TEXT_COLOR = stringPreferencesKey("clock_text_color")
+        val CLOCK_BACKGROUND = stringPreferencesKey("clock_background")
+        val CLOCK_BACKGROUND_OPACITY = intPreferencesKey("clock_background_opacity")
+        val CLOCK_CORNER_RADIUS = intPreferencesKey("clock_corner_radius")
+        val INFO_TEXT_COLOR = stringPreferencesKey("info_text_color")
+        val INFO_BACKGROUND = stringPreferencesKey("info_background")
+        val INFO_BACKGROUND_OPACITY = intPreferencesKey("info_background_opacity")
+        val INFO_CORNER_RADIUS = intPreferencesKey("info_corner_radius")
+        val OVERLAY_TEXT_COLOR_LEGACY = stringPreferencesKey("overlay_text_color")
+        val OVERLAY_BACKGROUND_LEGACY = booleanPreferencesKey("overlay_background")
+        val OVERLAY_BACKGROUND_OPACITY_LEGACY = intPreferencesKey("overlay_background_opacity")
+        val OVERLAY_CORNER_RADIUS_LEGACY = intPreferencesKey("overlay_corner_radius")
+
+        // Text colour modes. AUTO picks white or black per photo, from the brightness of
+        // the image under the pill, so the overlay stays readable either way.
+        const val TEXT_COLOR_LIGHT = "light"
+        const val TEXT_COLOR_DARK = "dark"
+        const val TEXT_COLOR_AUTO = "auto"
+
+        // How eagerly AUTO switches to dark text. Dark text only survives on a
+        // broadly bright patch, and white-on-photo is the look people expect, so even
+        // "balanced" asks for more brightness than a plain contrast-ratio would.
+        val CLOCK_AUTO_BIAS = intPreferencesKey("clock_auto_bias")
+        val INFO_AUTO_BIAS = intPreferencesKey("info_auto_bias")
+        const val AUTO_BIAS_LIGHT = 0      // needs a very bright corner to flip
+        const val AUTO_BIAS_BALANCED = 1
+        const val AUTO_BIAS_DARK = 2       // flips on a merely mid-bright corner
+
+        // Pill background modes. AUTO is the opposite of the resolved text colour.
+        const val BACKGROUND_NONE = "none"
+        const val BACKGROUND_DARK = "dark"
+        const val BACKGROUND_LIGHT = "light"
+        const val BACKGROUND_AUTO = "auto"
         val OVERLAY_ANIMATION = stringPreferencesKey("overlay_animation")
         val OVERLAY_MARQUEE = booleanPreferencesKey("overlay_marquee")
         val OVERLAY_EXPAND_SCALE = intPreferencesKey("overlay_expand_scale")
@@ -76,6 +111,26 @@ class SettingsRepository @Inject constructor(
         val OVERLAY_EXPANDED_INDEFINITE = booleanPreferencesKey("overlay_expanded_indefinite")
         val OVERLAY_COLLAPSED_INDEFINITE = booleanPreferencesKey("overlay_collapsed_indefinite")
         val OVERLAY_COLLAPSED_FIELDS = stringPreferencesKey("overlay_collapsed_fields")
+
+        // Clock styling: the clock pill is sized and styled independently of the
+        // photo-info pill, so it can be much larger and use a different face.
+        val CLOCK_SCALE = intPreferencesKey("clock_scale")
+        val CLOCK_FONT = stringPreferencesKey("clock_font")
+        val CLOCK_WEIGHT = stringPreferencesKey("clock_weight")
+        val CLOCK_LETTER_SPACING = intPreferencesKey("clock_letter_spacing")
+
+        // Clock font families
+        const val CLOCK_FONT_SANS = "sans"
+        const val CLOCK_FONT_SERIF = "serif"
+        const val CLOCK_FONT_MONO = "mono"
+        const val CLOCK_FONT_CONDENSED = "condensed"
+
+        // Clock font weights
+        const val CLOCK_WEIGHT_THIN = "thin"
+        const val CLOCK_WEIGHT_LIGHT = "light"
+        const val CLOCK_WEIGHT_NORMAL = "normal"
+        const val CLOCK_WEIGHT_MEDIUM = "medium"
+        const val CLOCK_WEIGHT_BOLD = "bold"
 
         // Overlay position values
         const val OVERLAY_POS_TOP_START = "top_start"
@@ -176,13 +231,58 @@ class SettingsRepository @Inject constructor(
     val dateFormat: Flow<String> = context.dataStore.data.map { it[DATE_FORMAT] ?: "MMM dd, yyyy" }
 
     // Overlay presentation
-    val overlayTextSize: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_SIZE] ?: "medium" }
-    val overlayTextColor: Flow<String> = context.dataStore.data.map { it[OVERLAY_TEXT_COLOR] ?: "light" }
-    val overlayBackground: Flow<Boolean> = context.dataStore.data.map { it[OVERLAY_BACKGROUND] ?: true }
-    val overlayBackgroundOpacity: Flow<Int> = context.dataStore.data.map { it[OVERLAY_BACKGROUND_OPACITY] ?: 53 }
+    // The photo info used to be three presets (small/medium/large). It is now a
+    // continuous scale like the clock, so old values are read once and converted.
+    val overlayScale: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[OVERLAY_SCALE] ?: when (prefs[OVERLAY_TEXT_SIZE_LEGACY]) {
+            "small" -> 85
+            "large" -> 130
+            else -> 100
+        }
+    }
     val overlayClockPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_CLOCK_POSITION] ?: OVERLAY_POS_TOP_START }
     val overlayInfoPosition: Flow<String> = context.dataStore.data.map { it[OVERLAY_INFO_POSITION] ?: OVERLAY_POS_BOTTOM_START }
-    val overlayCornerRadius: Flow<Int> = context.dataStore.data.map { it[OVERLAY_CORNER_RADIUS] ?: 16 }
+
+    val clockTextColor: Flow<String> = context.dataStore.data.map {
+        it[CLOCK_TEXT_COLOR] ?: it[OVERLAY_TEXT_COLOR_LEGACY] ?: TEXT_COLOR_LIGHT
+    }
+    val infoTextColor: Flow<String> = context.dataStore.data.map {
+        it[INFO_TEXT_COLOR] ?: it[OVERLAY_TEXT_COLOR_LEGACY] ?: TEXT_COLOR_LIGHT
+    }
+    val clockBackground: Flow<String> = context.dataStore.data.map {
+        it[CLOCK_BACKGROUND] ?: legacyBackground(it[OVERLAY_BACKGROUND_LEGACY])
+    }
+    val infoBackground: Flow<String> = context.dataStore.data.map {
+        it[INFO_BACKGROUND] ?: legacyBackground(it[OVERLAY_BACKGROUND_LEGACY])
+    }
+    val clockBackgroundOpacity: Flow<Int> = context.dataStore.data.map {
+        it[CLOCK_BACKGROUND_OPACITY] ?: it[OVERLAY_BACKGROUND_OPACITY_LEGACY] ?: 53
+    }
+    val infoBackgroundOpacity: Flow<Int> = context.dataStore.data.map {
+        it[INFO_BACKGROUND_OPACITY] ?: it[OVERLAY_BACKGROUND_OPACITY_LEGACY] ?: 53
+    }
+    val clockAutoBias: Flow<Int> = context.dataStore.data.map {
+        it[CLOCK_AUTO_BIAS] ?: AUTO_BIAS_BALANCED
+    }
+    val infoAutoBias: Flow<Int> = context.dataStore.data.map {
+        it[INFO_AUTO_BIAS] ?: AUTO_BIAS_BALANCED
+    }
+    val clockCornerRadius: Flow<Int> = context.dataStore.data.map {
+        it[CLOCK_CORNER_RADIUS] ?: it[OVERLAY_CORNER_RADIUS_LEGACY] ?: 16
+    }
+    val infoCornerRadius: Flow<Int> = context.dataStore.data.map {
+        it[INFO_CORNER_RADIUS] ?: it[OVERLAY_CORNER_RADIUS_LEGACY] ?: 16
+    }
+
+    private fun legacyBackground(value: Boolean?): String =
+        if (value == false) BACKGROUND_NONE else BACKGROUND_AUTO
+
+    // Clock styling (independent of the photo-info overlay)
+    val clockScale: Flow<Int> = context.dataStore.data.map { it[CLOCK_SCALE] ?: 100 }
+    val clockFont: Flow<String> = context.dataStore.data.map { it[CLOCK_FONT] ?: CLOCK_FONT_SANS }
+    val clockWeight: Flow<String> = context.dataStore.data.map { it[CLOCK_WEIGHT] ?: CLOCK_WEIGHT_LIGHT }
+    // Letter spacing in tenths of an sp (negative tightens, positive opens up).
+    val clockLetterSpacing: Flow<Int> = context.dataStore.data.map { it[CLOCK_LETTER_SPACING] ?: 0 }
     val overlayAnimation: Flow<String> = context.dataStore.data.map {
         when (it[OVERLAY_ANIMATION]) {
             null -> OVERLAY_ANIM_STATIC

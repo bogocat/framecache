@@ -28,6 +28,8 @@ FrameCache: Device app ←—reads local disk—→ [cached JPEGs + Room DB]
 - **Background blur** — blurred version of the photo behind the main image
 - **Metadata overlays** — clock, date, photo date, location, description, people, camera, rating, person age
 - **Overlay styling & motion** — independent expanded/collapsed sizes, corner position, text size/colour, background opacity, corner radius, marquee for long lines, and a Static/Loop/Once expand-collapse cycle
+- **Independent clock style** — the clock (and the date under it) is sized separately from the photo info, with its own font family (sans / serif / condensed / mono), weight, and letter spacing, so it can be a large statement piece while the info stays small
+- **Auto-contrast overlays** — text colour can be `Auto`, which samples the brightness of the photo under each pill (per corner, 80th percentile) and picks white or black so the overlay stays readable on bright skies *and* dark shadows, with or without a background
 - **Music (Navidrome)** — browse artists → albums → songs, cache favourites / playlists / individual songs offline, with a configurable now-playing pill over the slideshow
 - **Cast to Denon** — stream playback to a Denon/HEOS receiver over DLNA (the receiver pulls the stream directly); accurate progress + seeking
 - **Sleep schedule** — dim or black screen during configurable hours
@@ -77,18 +79,19 @@ Get album IDs from the URL when viewing an album in Immich (the UUID in the addr
 
 ## Settings
 
-Swipe down or long-press on the slideshow to open settings.
+Swipe down or long-press on the slideshow to open settings. Sections are collapsible and show their current state while closed (e.g. `Clock — 12-hour · Condensed Light · 200% · date`), and controls that no longer apply are hidden: turning the clock off hides its format and styling, with music off the now-playing pill section disappears.
 
 | Section | Options |
 |---------|---------|
 | **Server Connection** | Server URL, API key, album IDs |
 | **Photo Sources** | Immich albums, local folder |
 | **Slideshow** | Photo duration (presets + custom, 1s–24h), crossfade, Ken Burns + zoom, background blur, fill vs fit, progress bar, order, favourites only, photo orientation |
-| **Overlays** | Show toggles (clock, date, photo date, location, description, people, camera, rating, age); overlay style (position, text size/colour, background + opacity, corner radius); motion (collapse mode, expanded/collapsed holds, collapsed fields, marquee) |
-| **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements |
-| **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
+| **Clock** | Show clock, 12h/24h, show current date, position, size (in sp, with a live preview of the frame), font family (sans / serif / condensed / mono), weight (thin → bold), letter spacing, text colour (light / dark / **auto-contrast**), background (none / dark / light / auto) + opacity + corner radius |
+| **Photo Info** | Field toggles (photo date, location, description, people, camera, rating, person age); position, size (a multiplier on each line's default, with a live preview), text colour (light / dark / auto), background + opacity + corner radius; motion (collapse mode, expanded/collapsed ratios, holds, collapsed fields, marquee) |
 | **Sleep Schedule** | Enable/disable, start/end hours, dim vs black |
+| **Sync & Cache** | Sync interval (15 min–6 h), max cached photos (50–1000), sync now, last sync |
 | **Music (Navidrome)** | Server/credentials, enable, cache favourites, max cached songs, Denon host, sync now |
+| **Now Playing Pill** | Elements (art / title / artist / controls), expanded + collapsed size, opacity, corner radius, collapse mode + holds, collapsed elements — only while music is enabled |
 | **System** | Android Settings, WiFi, Bluetooth |
 
 ## Architecture

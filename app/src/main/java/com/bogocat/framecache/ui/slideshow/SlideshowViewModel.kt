@@ -53,13 +53,28 @@ class SlideshowViewModel @Inject constructor(
     val clockFormat = settings.clockFormat.stateIn(viewModelScope, SharingStarted.Eagerly, "12")
 
     // Overlay presentation
-    val overlayTextSize = settings.overlayTextSize.stateIn(viewModelScope, SharingStarted.Eagerly, "medium")
-    val overlayTextColor = settings.overlayTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, "light")
-    val overlayBackground = settings.overlayBackground.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    val overlayBackgroundOpacity = settings.overlayBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
+    val overlayScale = settings.overlayScale.stateIn(viewModelScope, SharingStarted.Eagerly, 100)
     val overlayClockPosition = settings.overlayClockPosition.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_POS_TOP_START)
     val overlayInfoPosition = settings.overlayInfoPosition.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.OVERLAY_POS_BOTTOM_START)
-    val overlayCornerRadius = settings.overlayCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+
+    // Presentation is per pill: the clock and the photo info sit over different parts
+    // of the photo and can be coloured independently (including auto-contrast).
+    val clockTextColor = settings.clockTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.TEXT_COLOR_LIGHT)
+    val clockBackground = settings.clockBackground.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.BACKGROUND_AUTO)
+    val clockBackgroundOpacity = settings.clockBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
+    val clockCornerRadius = settings.clockCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+    val clockAutoBias = settings.clockAutoBias.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.AUTO_BIAS_BALANCED)
+    val infoTextColor = settings.infoTextColor.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.TEXT_COLOR_LIGHT)
+    val infoBackground = settings.infoBackground.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.BACKGROUND_AUTO)
+    val infoBackgroundOpacity = settings.infoBackgroundOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 53)
+    val infoCornerRadius = settings.infoCornerRadius.stateIn(viewModelScope, SharingStarted.Eagerly, 16)
+    val infoAutoBias = settings.infoAutoBias.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.AUTO_BIAS_BALANCED)
+
+    // Clock styling — independent of the photo-info overlay's text size.
+    val clockScale = settings.clockScale.stateIn(viewModelScope, SharingStarted.Eagerly, 100)
+    val clockFont = settings.clockFont.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CLOCK_FONT_SANS)
+    val clockWeight = settings.clockWeight.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsRepository.CLOCK_WEIGHT_LIGHT)
+    val clockLetterSpacing = settings.clockLetterSpacing.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     // Now-playing pill
     val npShowArt = settings.npShowArt.stateIn(viewModelScope, SharingStarted.Eagerly, true)
